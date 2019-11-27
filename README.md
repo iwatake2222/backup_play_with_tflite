@@ -2,7 +2,7 @@
 ## Target environment
 - Coral Dev Board
 - Jetson Nano + USB Accelerator
-- Raspberry Pi 3/4 + USB Accelerator
+- Raspberry Pi 3 + USB Accelerator
 
 
 ## How to build application code
@@ -21,7 +21,8 @@ tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 
 cd ../my_project
 mkdir build && cd build
-cmake .. -DBUILD_TARGET=JETSON  # or  cmake .. -DBUILD_TARGET=RASPI
+cmake .. -DARCH_TYPE=armv7		## For Raspberry Pi
+# cmake .. -DARCH_TYPE=aarch64	## For Jetson Nano, Coral Dev Board
 make
 mv libedgetpu.so.1.0 libedgetpu.so.1
 sudo LD_LIBRARY_PATH=./ ./main

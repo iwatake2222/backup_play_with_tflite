@@ -1,15 +1,15 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.0)
 
 set(ProjectName "main")
 
 # Switch build target
-set(BUILD_TARGET PC CACHE STRING "Build target?")
-if(${BUILD_TARGET} STREQUAL RASPI)
-	message("[BUILD] Raspberry Pi")
+set(ARCH_TYPE PC CACHE STRING "Build target? [armv7, aarch64]")
+if(${ARCH_TYPE} STREQUAL armv7)
+	message("[BUILD] armv7")
 	set(LIB_TENSORFLOW_LITE ${CMAKE_SOURCE_DIR}/../third_party/tensorflow_prebuilt/rpi_armv7l/lib/libtensorflow-lite.a)
 	set(LIB_EDGETPU         ${CMAKE_SOURCE_DIR}/../third_party/edgetpu/libedgetpu/direct/armv7a/libedgetpu.so.1.0)
-elseif(${BUILD_TARGET} STREQUAL JETSON)
-	message("[BUILD] Jetson")
+elseif(${ARCH_TYPE} STREQUAL aarch64)
+	message("[BUILD] aarch64")
 	set(LIB_TENSORFLOW_LITE ${CMAKE_SOURCE_DIR}/../third_party/tensorflow_prebuilt/generic-aarch64_armv8-a/lib/libtensorflow-lite.a)
 	set(LIB_EDGETPU         ${CMAKE_SOURCE_DIR}/../third_party/edgetpu/libedgetpu/direct/aarch64/libedgetpu.so.1.0)
 else()

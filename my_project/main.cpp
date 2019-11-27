@@ -1,67 +1,81 @@
+/*** Include ***/
+/* for general */
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
+
+/* for OpenCV */
 #include <opencv2/opencv.hpp>
 
-#include "edgetpu.h"
-#include "utils.h"
+/* for Edge TPU */
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/model.h"
+#include "edgetpu.h"
+#include "model_utils.h"
 
-/*** Model parameters ***/
+/*** Macro ***/
+/* Model parameters */
 #define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant_edgetpu.tflite"
+#define LABEL_NAME     RESOURCE"/imagenet_labels.txt"
 #define MODEL_WIDTH 224
 #define MODEL_HEIGHT 224
 #define MODEL_CHANNEL 3
 
+/* Settings */
 #define LOOP_NUM_FOR_TIME_MEASUREMENT 1000
+
+/*** Function ***/
+static void readLabel(const char* filename, std::vector<std::string> &labels)
+{
+	std::ifstream ifs(filename);
+	if (ifs.fail()) {
+		printf("failed to read %s\n", filename);
+		return;
+	}
+	std::string str;
+	while(getline(ifs, str)) {
+		labels.push_back(str);
+	}
+}
 
 int main()
 {
-	/*** Create interpreter ***/
-	/* read model */
+	/*** Initialize ***/
+	/* read label */
+	std::vector<std::string> labels;
+	readLabel(LABEL_NAME, labels);
+
+	/* Create interpreter */
 	std::unique_ptr<tflite::FlatBufferModel> model = tflite::FlatBufferModel::BuildFromFile(MODEL_FILENAME);
-	/* Build interpreter */
 	std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_context = edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
 	std::unique_ptr<tflite::Interpreter> interpreter = coral::BuildEdgeTpuInterpreter(*model, edgetpu_context.get());
 
-	/*** Read input image data ***/
+	/*** Process for each frame ***/
+	/* Read input image data */
 	cv::Mat inputImage = cv::imread(RESOURCE"/parrot.jpg");
-	cv::cvtColor(inputImage, inputImage, CV_BGR2RGB);
+	/* Pre-process */
+	cv::cvtColor(inputImage, inputImage, cv::COLOR_BGR2RGB);
 	cv::resize(inputImage, inputImage, cv::Size(MODEL_WIDTH, MODEL_HEIGHT));
 	std::vector<uint8_t> inputData(inputImage.data, inputImage.data + (inputImage.cols * inputImage.rows * inputImage.elemSize()));
 
-	/*** Run inference ***/
-	const auto& result = coral::RunInference(inputData, interpreter.get());
+	/* Run inference */
+	const auto& scores = coral::RunInference(inputData, interpreter.get());
 
-	/*** Retrieve result ***/
-	// for (int i = 0; i < result.size(); i++) printf("%5d: %f\n", i, result[i]);
-	auto it_a = std::max_element(result.begin(), result.end());
-	printf("Max index: %ld (%.3f)\n", std::distance(result.begin(), it_a), *it_a);
+	/* Retrieve the result */
+	int maxIndex = std::max_element(scores.begin(), scores.end()) - scores.begin();
+	float maxScore = *std::max_element(scores.begin(), scores.end());
+	printf("%s (%.3f)\n", labels[maxIndex].c_str(), maxScore);
 
-	/*** Measure calculation time ***/
+
+	/*** (Optional) Measure inference time ***/
 	const auto& t0 = std::chrono::steady_clock::now();
 	for (int i = 0; i < LOOP_NUM_FOR_TIME_MEASUREMENT; i++) {
 		coral::RunInference(inputData, interpreter.get());
 	}
 	const auto& t1 = std::chrono::steady_clock::now();
 	std::chrono::duration<double> timeSpan = t1 - t0;
-	printf("Calculation time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
+	printf("Inference time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
 	
 	return 0;
 }
 
-#if 0
-how to build
-mkdir build && cd build
-wget https://dl.google.com/coral/canned_models/mobilenet_v2_1.0_224_quant_edgetpu.tflite
-wget http://download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224_quant.tgz
-tar xfz mobilenet_v2_1.0_224_quant.tgz
-wget https://coral.withgoogle.com/static/docs/images/parrot.jpg
-cp ../external_libs/edgetpu-native/libedgetpu/libedgetpu_arm64.so libedgetpu.so.1
-# cp ../external_libs/edgetpu-native/libedgetpu/libedgetpu_arm32.so libedgetpu.so
-cmake .. -DBUILD_TARGET=JETSON_NATIVE
-# cmake .. -DBUILD_TARGET=RASPI_NATIVE
-make -j2
-sudo LD_LIBRARY_PATH=./ ./NumberDetector
-#endif
