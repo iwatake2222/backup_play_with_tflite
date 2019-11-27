@@ -19,7 +19,7 @@ chmod +x tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 # [This causes error ->] sh tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 
-cd ../my_project
+cd ../project_classification
 mkdir build && cd build
 cmake .. -DARCH_TYPE=armv7		## For Raspberry Pi
 # cmake .. -DARCH_TYPE=aarch64	## For Jetson Nano, Coral Dev Board
