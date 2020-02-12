@@ -1,15 +1,20 @@
 /*** Include ***/
 /* for general */
+#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
+#include <fstream> 
+#include <vector>
+#include <string>
 #include <chrono>
 
 /* for OpenCV */
 #include <opencv2/opencv.hpp>
 
-/* for Edge TPU */
+/* for Tensorflow Lite */
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/model.h"
+
+/* for Edge TPU */
 #include "edgetpu.h"
 #include "model_utils.h"
 

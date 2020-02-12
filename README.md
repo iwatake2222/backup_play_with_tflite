@@ -55,3 +55,11 @@ tensorflow/tensorflow/lite/tools/make/build_rpi_lib.sh
 ls tensorflow/tensorflow/lite/tools/make/gen/generic-aarch64_armv8-a/lib
 ```
 
+# Acknowledge
+The models are retrieved from:
+
+- https://coral.withgoogle.com/models/
+	- https://dl.google.com/coral/canned_models/mobilenet_v2_1.0_224_quant_edgetpu.tflite
+	- http://download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224_quant.tgz
+- https://www.tensorflow.org/lite/guide/hosted_models
+	- https://storage.googleapis.com/download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224.tgz
