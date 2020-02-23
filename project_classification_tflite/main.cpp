@@ -23,9 +23,9 @@
 
 /*** Macro ***/
 /* Model parameters */
-//#define USE_EDGETPU_DELEGATE
-//#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant_edgetpu.tflite"
-#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant.tflite"
+#define USE_EDGETPU_DELEGATE
+#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant_edgetpu.tflite"
+//#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant.tflite"
 // #define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224.tflite"
 #define LABEL_NAME     RESOURCE"/imagenet_labels.txt"
 
@@ -89,7 +89,7 @@ int main()
 	int   modelOutputNum = 0;
 	bool isQuantizedModel = false;
 	float modelOutputQscale = 1.0;
-	float modelOutputZeroPoint = 0;
+	int   modelOutputZeroPoint = 0;
 
 	for (int i = 0; i < inputTensor->dims->size; i++) printf("inputTensor->dims->size[%d]: %d\n", i, inputTensor->dims->data[i]);
 	for (int i = 0; i < outputTensor->dims->size; i++) printf("outputTensor->dims->size[%d]: %d\n", i, outputTensor->dims->data[i]);
@@ -102,7 +102,7 @@ int main()
 		isQuantizedModel = true;
 		modelOutputQscale = outputTensor->params.scale;
 		modelOutputZeroPoint = outputTensor->params.zero_point;
-		printf("model is quantized. qcale = %f, zer_point = %f\n", modelOutputQscale, modelOutputZeroPoint);
+		printf("model is quantized. qcale = %f, zer_point = %d\n", modelOutputQscale, modelOutputZeroPoint);
 	}
 
 	/*** Process for each frame ***/

@@ -26,8 +26,10 @@ cmake ..						## For x64 PC (Windows, Linux)
 # cmake .. -DARCH_TYPE=armv7	## For Raspberry Pi
 # cmake .. -DARCH_TYPE=aarch64	## For Jetson Nano, Coral Dev Board
 make
-mv libedgetpu.so.1.0 libedgetpu.so.1
-sudo LD_LIBRARY_PATH=./ ./main
+
+./main
+# mv libedgetpu.so.1.0 libedgetpu.so.1
+# sudo LD_LIBRARY_PATH=./ ./main
 
 ```
 
