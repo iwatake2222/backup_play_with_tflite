@@ -102,6 +102,13 @@ ls ./bazel-bin/tensorflow/lite/tensorflowlite.dll.if.lib
 ```
 
 ## Acknowledge
+### External libraries
+- third_party/tensorflow_prebuilt/
+	- prebuilt libraries are generated from https://github.com/tensorflow/tensorflow 
+- third_party/edgetpu_runtime/
+	- is copied from https://dl.google.com/coral/edgetpu_api/edgetpu_runtime_20200128.zip
+
+### Models
 The models are retrieved from:
 
 - https://coral.withgoogle.com/models/
@@ -109,3 +116,5 @@ The models are retrieved from:
 	- http://download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224_quant.tgz
 - https://www.tensorflow.org/lite/guide/hosted_models
 	- https://storage.googleapis.com/download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224.tgz
+
+
