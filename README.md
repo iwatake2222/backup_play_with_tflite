@@ -15,9 +15,9 @@ sudo apt install curl cmake
 cd EdgeTPU_CPP
 git submodule init
 git submodule update
-cd third_party
-chmod +x tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
-tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
+cd third_party/tensorflow
+chmod +x tensorflow/lite/tools/make/download_dependencies.sh
+tensorflow/lite/tools/make/download_dependencies.sh
 # [This causes error ->] sh tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 
 cd ../project_classification
