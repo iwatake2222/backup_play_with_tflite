@@ -20,12 +20,12 @@ chmod +x tensorflow/lite/tools/make/download_dependencies.sh
 tensorflow/lite/tools/make/download_dependencies.sh
 # [This causes error ->] sh tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 
-cd ../project_classification_tflite
+cd ../../project_classification_tflite
 mkdir build && cd build
-cmake ..						## For x64 PC (Windows, Linux)
-# cmake .. -DARCH_TYPE=armv7	## For Raspberry Pi
-# cmake .. -DARCH_TYPE=aarch64	## For Jetson Nano, Coral Dev Board
-# cmake .. -DARCH_TYPE=armv7 -DUSE_EDGETPU=off	## without Edge TPU (use TensorflowLite)
+cmake .. -DUSE_EDGETPU=on							## For x64 PC (Windows, Linux)
+# cmake .. -DARCH_TYPE=armv7   -DUSE_EDGETPU=on		## For Raspberry Pi
+# cmake .. -DARCH_TYPE=aarch64 -DUSE_EDGETPU=on 	## For Jetson Nano, Coral Dev Board
+# cmake .. -DARCH_TYPE=armv7   -DUSE_EDGETPU=off	## without Edge TPU (use TensorflowLite)
 make
 
 ./main
