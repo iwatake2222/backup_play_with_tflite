@@ -20,11 +20,12 @@ chmod +x tensorflow/lite/tools/make/download_dependencies.sh
 tensorflow/lite/tools/make/download_dependencies.sh
 # [This causes error ->] sh tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 
-cd ../project_classification
+cd ../project_classification_tflite
 mkdir build && cd build
 cmake ..						## For x64 PC (Windows, Linux)
 # cmake .. -DARCH_TYPE=armv7	## For Raspberry Pi
 # cmake .. -DARCH_TYPE=aarch64	## For Jetson Nano, Coral Dev Board
+# cmake .. -DARCH_TYPE=armv7 -DUSE_EDGETPU=off	## without Edge TPU (use TensorflowLite)
 make
 
 ./main
@@ -32,6 +33,10 @@ make
 # sudo LD_LIBRARY_PATH=./ ./main
 
 ```
+
+### Notice for Windows users
+I noticed running with `Debug` causes exception, so use `Release` or `RelWithDebInfo` in Visual Studio.
+
 
 ## How to create pre-built TensorflowLite library
 ### Common
