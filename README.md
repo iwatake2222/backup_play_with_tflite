@@ -50,20 +50,6 @@ git cherry-pick e8376142f50982e2bc22fae2d62f8fcfc6e88df7
 git cherry-pick 72cd947f231950d7ecd1406b5a67388fef7133ea
 
 ./tensorflow/lite/tools/make/download_dependencies.sh
-
-nano tensorflow/lite/build_def.bzl 
-###
-# --- a/tensorflow/lite/build_def.bzl
-# +++ b/tensorflow/lite/build_def.bzl
-# @@ -159,6 +159,7 @@ def tflite_cc_shared_object(
-#      tf_cc_shared_object(
-#          name = name,
-#          copts = copts,
-# +        features = ["windows_export_all_symbols"],
-#          linkstatic = linkstatic,
-#          linkopts = linkopts + tflite_jni_linkopts(),
-#          framework_so = [],
-###
 ```
 
 ### For Linux (x64, ARM), static library
@@ -100,6 +86,22 @@ conda install python
 conda install numpy
 
 cd path-to-tensorflow
+
+# modify bazel script
+nano tensorflow/lite/build_def.bzl 
+###
+# --- a/tensorflow/lite/build_def.bzl
+# +++ b/tensorflow/lite/build_def.bzl
+# @@ -159,6 +159,7 @@ def tflite_cc_shared_object(
+#      tf_cc_shared_object(
+#          name = name,
+#          copts = copts,
+# +        features = ["windows_export_all_symbols"],
+#          linkstatic = linkstatic,
+#          linkopts = linkopts + tflite_jni_linkopts(),
+#          framework_so = [],
+###
+
 python configure.py
 bazel build -c opt //tensorflow/lite:tensorflowlite
 ls ./bazel-bin/tensorflow/lite/tensorflowlite.dll
@@ -121,5 +123,6 @@ The models are retrieved from:
 	- http://download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224_quant.tgz
 - https://www.tensorflow.org/lite/guide/hosted_models
 	- https://storage.googleapis.com/download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224.tgz
-
+- https://www.tensorflow.org/lite/models/object_detection/overview
+	- https://storage.googleapis.com/download.tensorflow.org/models/tflite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.zip
 

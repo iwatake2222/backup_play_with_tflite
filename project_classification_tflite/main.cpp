@@ -23,15 +23,16 @@
 
 /*** Macro ***/
 /* Model parameters */
-#define USE_EDGETPU_DELEGATE
-#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant_edgetpu.tflite"
-//#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant.tflite"
-// #define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224.tflite"
+//#define USE_EDGETPU_DELEGATE
+//#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant_edgetpu.tflite"
+#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant.tflite"
+//#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224.tflite"
 #define LABEL_NAME     RESOURCE"/imagenet_labels.txt"
 
 
 /* Settings */
-#define LOOP_NUM_FOR_TIME_MEASUREMENT 100
+#define LOOP_NUM_FOR_TIME_MEASUREMENT 10
+
 
 #define TFLITE_MINIMAL_CHECK(x)                              \
   if (!(x)) {                                                \
@@ -40,6 +41,46 @@
   }
 
 /*** Function ***/
+static void displayModelInfo(const tflite::Interpreter* interpreter)
+{
+	const auto& inputIndices = interpreter->inputs();
+	int inputNum = inputIndices.size();
+	printf("Input num = %d\n", inputNum);
+	for (int i = 0; i < inputNum; i++) {
+		auto* tensor = interpreter->tensor(inputIndices[i]);
+		std::vector<int> tensorSize;
+		for (int j = 0; j < tensor->dims->size; j++) {
+			printf("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
+			tensorSize.push_back(tensor->dims->data[j]);
+		}
+		if (tensor->type == kTfLiteUInt8) {
+			printf("    tensor[%d]->type: quantized\n", i);
+			printf("    tensor[%d]->params.outputZeroPoint, scale: %d, %f\n", i, tensor->params.zero_point, tensor->params.scale);
+		} else {
+			printf("    tensor[%d]->type: not quantized\n", i);
+		}
+	}
+
+	const auto& outputIndices = interpreter->outputs();
+	int outputNum = outputIndices.size();
+	printf("Output num = %d\n", outputNum);
+	for (int i = 0; i < outputNum; i++) {
+		auto* tensor = interpreter->tensor(outputIndices[i]);
+		std::vector<int> tensorSize;
+		for (int j = 0; j < tensor->dims->size; j++) {
+			printf("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
+			tensorSize.push_back(tensor->dims->data[j]);
+		}
+		if (tensor->type == kTfLiteUInt8) {
+			printf("    tensor[%d]->type: quantized\n", i);
+			printf("    tensor[%d]->params.outputZeroPoint, scale: %d, %f\n", i, tensor->params.zero_point, tensor->params.scale);
+		} else {
+			printf("    tensor[%d]->type: not quantized\n", i);
+		}
+	}
+}
+
+
 static void readLabel(const char* filename, std::vector<std::string> & labels)
 {
 	std::ifstream ifs(filename);
@@ -68,85 +109,68 @@ int main()
 	std::unique_ptr<tflite::Interpreter> interpreter;
 	builder(&interpreter);
 	TFLITE_MINIMAL_CHECK(interpreter != nullptr);
+	interpreter->SetNumThreads(4);
 #ifdef USE_EDGETPU_DELEGATE
 	size_t num_devices;
 	std::unique_ptr<edgetpu_device, decltype(&edgetpu_free_devices)> devices(edgetpu_list_devices(&num_devices), &edgetpu_free_devices);
 	TFLITE_MINIMAL_CHECK(num_devices > 0);
 	const auto& device = devices.get()[0];
 	auto* delegate = edgetpu_create_delegate(device.type, device.path, nullptr, 0);
-	interpreter->ModifyGraphWithDelegate({delegate, edgetpu_free_delegate});
+	interpreter->ModifyGraphWithDelegate({ delegate, edgetpu_free_delegate });
 #endif
-	interpreter->SetNumThreads(4);
 	TFLITE_MINIMAL_CHECK(interpreter->AllocateTensors() == kTfLiteOk);
-	// tflite::PrintInterpreterState(interpreter.get());
+
 
 	/* Get model information */
-	auto* inputTensor = interpreter->input_tensor(0);
-	auto* outputTensor = interpreter->output_tensor(0);
-	int   modelInputWidth = 0;
-	int   modelInputHeight = 0;
-	int   modelInputChannel = 0;
-	int   modelOutputNum = 0;
-	bool isQuantizedModel = false;
-	float modelOutputQscale = 1.0;
-	int   modelOutputZeroPoint = 0;
+	displayModelInfo(interpreter.get());
+	const TfLiteTensor* inputTensor = interpreter->input_tensor(0);
+	const int modelInputHeight = inputTensor->dims->data[1];
+	const int modelInputWidth = inputTensor->dims->data[2];
+	const int modelInputChannel = inputTensor->dims->data[3];
 
-	for (int i = 0; i < inputTensor->dims->size; i++) printf("inputTensor->dims->size[%d]: %d\n", i, inputTensor->dims->data[i]);
-	for (int i = 0; i < outputTensor->dims->size; i++) printf("outputTensor->dims->size[%d]: %d\n", i, outputTensor->dims->data[i]);
-	modelInputHeight = inputTensor->dims->data[1];
-	modelInputWidth = inputTensor->dims->data[2];
-	modelInputChannel = inputTensor->dims->data[3];
-	modelOutputNum = outputTensor->dims->data[1];
-	
-	if (outputTensor->type == kTfLiteUInt8) {
-		isQuantizedModel = true;
-		modelOutputQscale = outputTensor->params.scale;
-		modelOutputZeroPoint = outputTensor->params.zero_point;
-		printf("model is quantized. qcale = %f, zer_point = %d\n", modelOutputQscale, modelOutputZeroPoint);
+	std::vector<TfLiteTensor*> outputTensors;
+	int outputNum = interpreter->outputs().size();
+	for (int i = 0; i < outputNum; i++) {
+		outputTensors.push_back(interpreter->output_tensor(i));
 	}
+
 
 	/*** Process for each frame ***/
 	/* Read input image data */
 	cv::Mat inputImage = cv::imread(RESOURCE"/parrot.jpg");
 	cv::imshow("test", inputImage); cv::waitKey(1);
 
-	/* Pre-process */
+	/* Pre-process and Set data to input tensor */
 	cv::cvtColor(inputImage, inputImage, cv::COLOR_BGR2RGB);
 	cv::resize(inputImage, inputImage, cv::Size(modelInputWidth, modelInputHeight));
-	if (isQuantizedModel) {
+	if (inputTensor->type == kTfLiteUInt8) {
 		inputImage.convertTo(inputImage, CV_8UC3);
-	} else {
-		inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
-	}
-
-	/* Set data to input tensor */
-	if (isQuantizedModel) {
 		memcpy(inputTensor->data.int8, inputImage.reshape(0, 1).data, sizeof(int8_t) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 	} else {
+		inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
 		memcpy(inputTensor->data.f, inputImage.reshape(0, 1).data, sizeof(float) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 	}
 
 	/* Run inference */
 	TFLITE_MINIMAL_CHECK(interpreter->Invoke() == kTfLiteOk);
-	// tflite::PrintInterpreterState(interpreter.get());
 
 	/* Retrieve the result */
-	int maxIndex = 0;
-	float score  = -1;
-	if (isQuantizedModel) {
-		auto* scoresArray = outputTensor->data.uint8;
-		std::vector<uint8_t> scores(scoresArray, scoresArray + modelOutputNum);
-		maxIndex = std::max_element(scores.begin(), scores.end()) - scores.begin();
-		auto maxScore = *std::max_element(scores.begin(), scores.end());
-		score = (maxScore - modelOutputZeroPoint) * modelOutputQscale;
+	std::vector<float> outputScoreList;
+	int numOutput = interpreter->output_tensor(0)->dims->data[1];
+	if (interpreter->output_tensor(0)->type == kTfLiteUInt8) {
+		auto* scoresArray = interpreter->output_tensor(0)->data.uint8;
+		for (int i = 0; i < numOutput; i++) {
+			float val = (scoresArray[i] - interpreter->output_tensor(0)->params.zero_point) * interpreter->output_tensor(0)->params.scale;
+			outputScoreList.push_back(val);
+		}
 	} else {
-		auto* scoresArray = outputTensor->data.f;
-		std::vector<float> scores(scoresArray, scoresArray + modelOutputNum);
-		maxIndex = std::max_element(scores.begin(), scores.end()) - scores.begin();
-		auto maxScore = *std::max_element(scores.begin(), scores.end());
-		score = maxScore;
+		float *data = interpreter->output_tensor(0)->data.f;
+		outputScoreList.assign(&data[0], &data[numOutput]);
 	}
-	printf("%s (%.3f)\n", labels[maxIndex].c_str(), score);
+
+	int maxIndex = std::max_element(outputScoreList.begin(), outputScoreList.end()) - outputScoreList.begin();
+	auto maxScore = *std::max_element(outputScoreList.begin(), outputScoreList.end());
+	printf("%s (%.3f)\n", labels[maxIndex].c_str(), maxScore);
 
 
 	/*** (Optional) Measure inference time ***/
@@ -157,7 +181,7 @@ int main()
 	const auto& t1 = std::chrono::steady_clock::now();
 	std::chrono::duration<double> timeSpan = t1 - t0;
 	printf("Inference time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
-	
+
 	cv::waitKey(-1);
 	return 0;
 }
