@@ -23,10 +23,13 @@
 
 /*** Macro ***/
 /* Model parameters */
+#ifdef USE_EDGETPU
 #define USE_EDGETPU_DELEGATE
 #define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant_edgetpu.tflite"
-//#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant.tflite"
+#else
+#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224_quant.tflite"
 //#define MODEL_FILENAME RESOURCE"/mobilenet_v2_1.0_224.tflite"
+#endif
 #define LABEL_NAME     RESOURCE"/imagenet_labels.txt"
 
 

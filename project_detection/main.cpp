@@ -23,9 +23,12 @@
 
 /*** Macro ***/
 /* Model parameters */
+#ifdef USE_EDGETPU
 #define USE_EDGETPU_DELEGATE
 #define MODEL_FILENAME RESOURCE"/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29_edgetpu.tflite"
-//#define MODEL_FILENAME RESOURCE"/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.tflite"
+#else
+#define MODEL_FILENAME RESOURCE"/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.tflite"
+#endif
 #define LABEL_NAME     RESOURCE"/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.txt"
 
 /* Settings */
