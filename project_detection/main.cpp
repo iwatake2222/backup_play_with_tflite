@@ -54,14 +54,12 @@ typedef struct {
 static void displayModelInfo(const tflite::Interpreter* interpreter)
 {
 	const auto& inputIndices = interpreter->inputs();
-	int inputNum = inputIndices.size();
+	int inputNum = (int)inputIndices.size();
 	printf("Input num = %d\n", inputNum);
 	for (int i = 0; i < inputNum; i++) {
 		auto* tensor = interpreter->tensor(inputIndices[i]);
-		std::vector<int> tensorSize;
 		for (int j = 0; j < tensor->dims->size; j++) {
 			printf("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
-			tensorSize.push_back(tensor->dims->data[j]);
 		}
 		if (tensor->type == kTfLiteUInt8) {
 			printf("    tensor[%d]->type: quantized\n", i);
@@ -72,14 +70,12 @@ static void displayModelInfo(const tflite::Interpreter* interpreter)
 	}
 
 	const auto& outputIndices = interpreter->outputs();
-	int outputNum = outputIndices.size();
+	int outputNum = (int)outputIndices.size();
 	printf("Output num = %d\n", outputNum);
 	for (int i = 0; i < outputNum; i++) {
 		auto* tensor = interpreter->tensor(outputIndices[i]);
-		std::vector<int> tensorSize;
 		for (int j = 0; j < tensor->dims->size; j++) {
 			printf("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
-			tensorSize.push_back(tensor->dims->data[j]);
 		}
 		if (tensor->type == kTfLiteUInt8) {
 			printf("    tensor[%d]->type: quantized\n", i);
@@ -90,6 +86,26 @@ static void displayModelInfo(const tflite::Interpreter* interpreter)
 	}
 }
 
+static void extractTensorAsFloatVector(const TfLiteTensor* tensor, std::vector<float> &output)
+{
+	int dataNum = 1;
+	for (int i = 0; i < tensor->dims->size; i++) {
+		dataNum *= tensor->dims->data[i];
+	}
+	output.resize(dataNum);
+	if (tensor->type == kTfLiteUInt8) {
+		const auto *valUint8 = tensor->data.uint8;
+		for (int i = 0; i < dataNum; i++) {
+			float valFloat = (valUint8[i] - tensor->params.zero_point) * tensor->params.scale;
+			output[i] = valFloat;
+		}
+	} else {
+		for (int i = 0; i < dataNum; i++) {
+			float valFloat = tensor->data.f[i];
+			output[i] = valFloat;
+		}
+	}
+}
 
 static void readLabel(const char* filename, std::vector<std::string> & labels)
 {
@@ -107,7 +123,7 @@ static void readLabel(const char* filename, std::vector<std::string> & labels)
 static void getBBox(std::vector<BBox> &bboxList, const float *outputBoxList, const float *outputClassList, const float *outputScoreList, const int outputNum, const double threshold, const int imageWidth = 0, const int imageHeight = 0)
 {
 	for (int i = 0; i < outputNum; i++) {
-		int classId = outputClassList[i] + 1;
+		int classId = (int)outputClassList[i] + 1;
 		float score = outputScoreList[i];
 		if (score < threshold) continue;
 		float y0 = outputBoxList[4 * i + 0];
@@ -190,27 +206,24 @@ int main()
 	TFLITE_MINIMAL_CHECK(interpreter->Invoke() == kTfLiteOk);
 
 	/* Retrieve the result */
-	const float *outputBoxList;
-	const float *outputClassList;
-	const float *outputScoreList;
-	int outputNum;
-	if (interpreter->output_tensor(0)->type == kTfLiteUInt8) {
-		// todo
-	} else {
-		outputBoxList = interpreter->output_tensor(0)->data.f;
-		outputClassList = interpreter->output_tensor(1)->data.f;
-		outputScoreList = interpreter->output_tensor(2)->data.f;
-		outputNum = (int)(*interpreter->output_tensor(3)->data.f);
-	}
+	std::vector<float> outputBoxList;
+	std::vector<float> outputClassList;
+	std::vector<float> outputScoreList;
+	std::vector<float> outputNumList;
+	extractTensorAsFloatVector(interpreter->output_tensor(0), outputBoxList);
+	extractTensorAsFloatVector(interpreter->output_tensor(1), outputClassList);
+	extractTensorAsFloatVector(interpreter->output_tensor(2), outputScoreList);
+	extractTensorAsFloatVector(interpreter->output_tensor(3), outputNumList);
+	int outputNum = (int)outputNumList[0];
 
 	/* Display bbox */
 	std::vector<BBox> bboxList;
-	getBBox(bboxList, outputBoxList, outputClassList, outputScoreList, outputNum, 0.5, originalImage.cols, originalImage.rows);
+	getBBox(bboxList, outputBoxList.data(), outputClassList.data(), outputScoreList.data(), outputNum, 0.5, originalImage.cols, originalImage.rows);
 	for (int i = 0; i < bboxList.size(); i++) {
 		const BBox bbox = bboxList[i];
-		cv::rectangle(originalImage, cv::Rect(bbox.x, bbox.y, bbox.w, bbox.h), cv::Scalar(255, 255, 0));
-		cv::putText(originalImage, labels[bbox.classId], cv::Point(bbox.x, bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
-		cv::putText(originalImage, labels[bbox.classId], cv::Point(bbox.x, bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1);
+		cv::rectangle(originalImage, cv::Rect((int)bbox.x, (int)bbox.y, (int)bbox.w, (int)bbox.h), cv::Scalar(255, 255, 0));
+		cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
+		cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1);
 	}
 	cv::imshow("test", originalImage); cv::waitKey(1);
 

@@ -20,7 +20,7 @@ chmod +x tensorflow/lite/tools/make/download_dependencies.sh
 tensorflow/lite/tools/make/download_dependencies.sh
 # [This causes error ->] sh tensorflow/tensorflow/lite/tools/make/download_dependencies.sh
 
-cd ../../project_classification_tflite
+cd ../../project_classification
 mkdir build && cd build
 cmake .. -DUSE_EDGETPU=on							## For x64 PC (Windows, Linux)
 # cmake .. -DARCH_TYPE=armv7   -DUSE_EDGETPU=on		## For Raspberry Pi

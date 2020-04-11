@@ -32,7 +32,7 @@
 #define LABEL_NAME     RESOURCE"/pascal_voc_segmentation_labels.txt"
 
 /* Settings */
-#define LOOP_NUM_FOR_TIME_MEASUREMENT 10
+#define LOOP_NUM_FOR_TIME_MEASUREMENT 100
 
 #define TFLITE_MINIMAL_CHECK(x)                              \
   if (!(x)) {                                                \
@@ -40,15 +40,6 @@
     exit(1);                                                 \
   }
 
-typedef struct {
-	double x;
-	double y;
-	double w;
-	double h;
-	int classId;
-	std::string classIdName;
-	double score;
-} BBox;
 
 /*** Function ***/
 static void displayModelInfo(const tflite::Interpreter* interpreter)
@@ -58,10 +49,8 @@ static void displayModelInfo(const tflite::Interpreter* interpreter)
 	printf("Input num = %d\n", inputNum);
 	for (int i = 0; i < inputNum; i++) {
 		auto* tensor = interpreter->tensor(inputIndices[i]);
-		std::vector<int> tensorSize;
 		for (int j = 0; j < tensor->dims->size; j++) {
 			printf("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
-			tensorSize.push_back(tensor->dims->data[j]);
 		}
 		if (tensor->type == kTfLiteUInt8) {
 			printf("    tensor[%d]->type: quantized\n", i);
@@ -76,10 +65,8 @@ static void displayModelInfo(const tflite::Interpreter* interpreter)
 	printf("Output num = %d\n", outputNum);
 	for (int i = 0; i < outputNum; i++) {
 		auto* tensor = interpreter->tensor(outputIndices[i]);
-		std::vector<int> tensorSize;
 		for (int j = 0; j < tensor->dims->size; j++) {
 			printf("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
-			tensorSize.push_back(tensor->dims->data[j]);
 		}
 		if (tensor->type == kTfLiteUInt8) {
 			printf("    tensor[%d]->type: quantized\n", i);
@@ -90,6 +77,26 @@ static void displayModelInfo(const tflite::Interpreter* interpreter)
 	}
 }
 
+static void extractTensorAsFloatVector(const TfLiteTensor* tensor, std::vector<float> &output)
+{
+	int dataNum = 1;
+	for (int i = 0; i < tensor->dims->size; i++) {
+		dataNum *= tensor->dims->data[i];
+	}
+	output.resize(dataNum);
+	if (tensor->type == kTfLiteUInt8) {
+		const auto *valUint8 = tensor->data.uint8;
+		for (int i = 0; i < dataNum; i++) {
+			float valFloat = (valUint8[i] - tensor->params.zero_point) * tensor->params.scale;
+			output[i] = valFloat;
+		}
+	} else {
+		for (int i = 0; i < dataNum; i++) {
+			float valFloat = tensor->data.f[i];
+			output[i] = valFloat;
+		}
+	}
+}
 
 static void readLabel(const char* filename, std::vector<std::string> & labels)
 {

@@ -19,7 +19,7 @@ endif()
 
 # Create project
 project(${ProjectName})
-add_executable(${ProjectName} main.cpp model_utils.cc model_utils.h)
+add_executable(${ProjectName} main.cpp)
 
 # For OpenCV
 find_package(OpenCV REQUIRED)
