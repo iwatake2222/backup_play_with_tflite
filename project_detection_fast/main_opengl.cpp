@@ -10,6 +10,10 @@
 /* for OpenCV */
 #include <opencv2/opencv.hpp>
 
+/* For OpenGL */
+#include <GL/glut.h>
+#include <GL/freeglut.h>
+
 /* for Tensorflow Lite */
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/model.h"
@@ -49,6 +53,9 @@ typedef struct {
 	double score;
 } BBox;
 
+static cv::VideoCapture cap;
+static std::vector<std::string> labels;
+static std::unique_ptr<tflite::Interpreter> interpreter;
 
 /*** Function ***/
 static void displayModelInfo(const tflite::Interpreter* interpreter)
@@ -199,11 +206,107 @@ static void getBBox(std::vector<BBox> &bboxList, const float *outputBoxList, con
 	}
 }
 
+static void display(void)
+{
+	const auto& timeAll0 = std::chrono::steady_clock::now();
+	/* Read input image data */
+	const auto& timeCap0 = std::chrono::steady_clock::now();
+	cv::Mat originalImage;
+	cap.read(originalImage);
+	const auto& timeCap1 = std::chrono::steady_clock::now();
+	static cv::Mat inputImage;	// need to exist longer than interpreter (todo. can be better code...)
+
+	/* Pre-process and Set data to input tensor */
+	const auto& timePre0 = std::chrono::steady_clock::now();
+	const TfLiteTensor* inputTensor = interpreter->input_tensor(0);
+	const int modelInputHeight = inputTensor->dims->data[1];
+	const int modelInputWidth = inputTensor->dims->data[2];
+	cv::cvtColor(originalImage, originalImage, cv::COLOR_BGR2RGB);
+	cv::resize(originalImage, inputImage, cv::Size(modelInputWidth, modelInputHeight));
+	if (inputTensor->type == kTfLiteUInt8) {
+		//inputImage.convertTo(inputImage, CV_8UC3);
+	} else {
+		inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
+	}
+
+	static int s_setInputBufferOnce = 0;	// call this only once (todo. can be better code...)
+	if (s_setInputBufferOnce++ == 0) {
+		setBufferToTensor(interpreter.get(), interpreter->inputs()[0], (char*)inputImage.data, (int)(inputImage.total() * inputImage.elemSize()));
+	}
+	const auto& timePre1 = std::chrono::steady_clock::now();
+
+	/* Run inference */
+	const auto& timeInference0 = std::chrono::steady_clock::now();
+	TFLITE_MINIMAL_CHECK(interpreter->Invoke() == kTfLiteOk);
+	const auto& timeInference1 = std::chrono::steady_clock::now();
+
+	/* Retrieve the result */
+	const auto& timePost0 = std::chrono::steady_clock::now();
+	std::vector<float> outputBoxList;
+	std::vector<float> outputClassList;
+	std::vector<float> outputScoreList;
+	std::vector<float> outputNumList;
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[0], outputBoxList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[1], outputClassList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[2], outputScoreList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[3], outputNumList);
+	int outputNum = (int)outputNumList[0];
+
+	/* Display bbox */
+	std::vector<BBox> bboxList;
+	getBBox(bboxList, outputBoxList.data(), outputClassList.data(), outputScoreList.data(), outputNum, 0.5, originalImage.cols, originalImage.rows);
+	for (int i = 0; i < bboxList.size(); i++) {
+		const BBox bbox = bboxList[i];
+		cv::rectangle(originalImage, cv::Rect((int)bbox.x, (int)bbox.y, (int)bbox.w, (int)bbox.h), cv::Scalar(255, 255, 0));
+		cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
+		cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1);
+	}
+
+	glClear(GL_COLOR_BUFFER_BIT);
+	glDrawPixels(originalImage.cols, originalImage.rows, GL_RGB, GL_UNSIGNED_BYTE, originalImage.data);
+	glFlush();
+	const auto& timePost1 = std::chrono::steady_clock::now();
+
+	const auto& timeAll1 = std::chrono::steady_clock::now();
+	printf("Total time = %.3lf [msec]\n", (timeAll1 - timeAll0).count() / 1000000.0);
+	printf("Capture time = %.3lf [msec]\n", (timeCap1 - timeCap0).count() / 1000000.0);
+	printf("Inference time = %.3lf [msec]\n", (timeInference1 - timeInference0).count() / 1000000.0);
+	printf("PreProcess time = %.3lf [msec]\n", (timePre1 - timePre0).count() / 1000000.0);
+	printf("PostProcess time = %.3lf [msec]\n", (timePost1 - timePost0).count() / 1000000.0);
+
+	const auto& timeFpsNow = std::chrono::steady_clock::now();
+	static std::chrono::steady_clock::time_point timeFpsPrevious;
+	double callInterval = (timeFpsNow - timeFpsPrevious).count() / 1000000.0;
+	printf("FPS = %.1lf [fps], (%.3lf [msec])\n", 1000.0 / callInterval, callInterval);
+	printf("========\n");
+	timeFpsPrevious = timeFpsNow;
+}
+
+static void keyboard(unsigned char key, int x, int y)
+{
+	switch (key) {
+	case 'q':
+	case 'Q':
+	case '\033':
+		glutLeaveMainLoop();
+	default:
+		break;
+	}
+}
+
+static void idle(void)
+{
+	/* call nest display immediately */
+	glutPostRedisplay();
+}
+
 int main(int argc, char *argv[])
 {
+	int imageWidth = 720;
+	int imageHeight = 480;
+
 	/*** Initialize ***/
 	/* read label */
-	std::vector<std::string> labels;
 	readLabel(LABEL_NAME, labels);
 
 	/* Create interpreter */
@@ -211,7 +314,6 @@ int main(int argc, char *argv[])
 	TFLITE_MINIMAL_CHECK(model != nullptr);
 	tflite::ops::builtin::BuiltinOpResolver resolver;
 	tflite::InterpreterBuilder builder(*model, resolver);
-	std::unique_ptr<tflite::Interpreter> interpreter;
 	builder(&interpreter);
 	TFLITE_MINIMAL_CHECK(interpreter != nullptr);
 	interpreter->SetNumThreads(4);
@@ -230,89 +332,28 @@ int main(int argc, char *argv[])
 	displayModelInfo(interpreter.get());
 	
 	/* initialize camera */
-	static cv::VideoCapture cap;
 	cap = cv::VideoCapture(0);
-	cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-	cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+	cap.set(cv::CAP_PROP_FRAME_WIDTH, imageWidth);
+	cap.set(cv::CAP_PROP_FRAME_HEIGHT, imageHeight);
 	// cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('B', 'G', 'R', '3'));
 	cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
-	while(1) {
-		const auto& timeAll0 = std::chrono::steady_clock::now();
-		/* Read input image data */
-		const auto& timeCap0 = std::chrono::steady_clock::now();
-		cv::Mat originalImage;
-		cap.read(originalImage);
-		const auto& timeCap1 = std::chrono::steady_clock::now();
-		static cv::Mat inputImage;	// need to exist longer than interpreter (todo. can be better code...)
+	/* initialize OpenGL */
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGB);
+	glutInitWindowSize(imageWidth, imageHeight);
+	glutCreateWindow("Window");
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(0.0, imageWidth, 0.0, imageHeight);
+	glViewport(0, 0, imageWidth, imageHeight);
+	glutDisplayFunc(display);
+	glutKeyboardFunc(keyboard);
+	glutIdleFunc(idle);
 
-		/* Pre-process and Set data to input tensor */
-		const auto& timePre0 = std::chrono::steady_clock::now();
-		const TfLiteTensor* inputTensor = interpreter->input_tensor(0);
-		const int modelInputHeight = inputTensor->dims->data[1];
-		const int modelInputWidth = inputTensor->dims->data[2];
-		cv::resize(originalImage, inputImage, cv::Size(modelInputWidth, modelInputHeight));
-		cv::cvtColor(inputImage, inputImage, cv::COLOR_BGR2RGB);
-		if (inputTensor->type == kTfLiteUInt8) {
-			//inputImage.convertTo(inputImage, CV_8UC3);
-		} else {
-			inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
-		}
+	/*** Start loop ***/
+	glutMainLoop();
 
-		static int s_setInputBufferOnce = 0;	// call this only once (todo. can be better code...)
-		if (s_setInputBufferOnce++ == 0) {
-			setBufferToTensor(interpreter.get(), interpreter->inputs()[0], (char*)inputImage.data, (int)(inputImage.total() * inputImage.elemSize()));
-		}
-		const auto& timePre1 = std::chrono::steady_clock::now();
-
-		/* Run inference */
-		const auto& timeInference0 = std::chrono::steady_clock::now();
-		TFLITE_MINIMAL_CHECK(interpreter->Invoke() == kTfLiteOk);
-		const auto& timeInference1 = std::chrono::steady_clock::now();
-
-		/* Retrieve the result */
-		const auto& timePost0 = std::chrono::steady_clock::now();
-		std::vector<float> outputBoxList;
-		std::vector<float> outputClassList;
-		std::vector<float> outputScoreList;
-		std::vector<float> outputNumList;
-		extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[0], outputBoxList);
-		extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[1], outputClassList);
-		extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[2], outputScoreList);
-		extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[3], outputNumList);
-		int outputNum = (int)outputNumList[0];
-
-		/* Display bbox */
-		std::vector<BBox> bboxList;
-		getBBox(bboxList, outputBoxList.data(), outputClassList.data(), outputScoreList.data(), outputNum, 0.5, originalImage.cols, originalImage.rows);
-		for (int i = 0; i < bboxList.size(); i++) {
-			const BBox bbox = bboxList[i];
-			cv::rectangle(originalImage, cv::Rect((int)bbox.x, (int)bbox.y, (int)bbox.w, (int)bbox.h), cv::Scalar(255, 255, 0));
-			cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
-			cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1);
-		}
-
-		/* Display FPS */
-		const auto& timeFpsNow = std::chrono::steady_clock::now();
-		static std::chrono::steady_clock::time_point timeFpsPrevious;
-		double callInterval = (timeFpsNow - timeFpsPrevious).count() / 1000000.0;
-		char message[256];
-		snprintf(message, sizeof(message), "FPS = %.1lf [fps], (%.3lf [msec])", 1000.0 / callInterval, callInterval);
-		cv::putText(originalImage, message, cv::Point(10, 25), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 255, 0), 2);
-		timeFpsPrevious = timeFpsNow;
-
-		cv::imshow("test", originalImage);
-		if (cv::waitKey(1) == 'q') break;
-		const auto& timePost1 = std::chrono::steady_clock::now();
-
-		const auto& timeAll1 = std::chrono::steady_clock::now();
-		printf("Total time = %.3lf [msec]\n", (timeAll1 - timeAll0).count() / 1000000.0);
-		printf("Capture time = %.3lf [msec]\n", (timeCap1 - timeCap0).count() / 1000000.0);
-		printf("Inference time = %.3lf [msec]\n", (timeInference1 - timeInference0).count() / 1000000.0);
-		printf("PreProcess time = %.3lf [msec]\n", (timePre1 - timePre0).count() / 1000000.0);
-		printf("PostProcess time = %.3lf [msec]\n", (timePost1 - timePost0).count() / 1000000.0);
-		printf("========\n");
-	}
 
 	model.release();
 	interpreter.release();
