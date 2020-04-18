@@ -214,7 +214,7 @@ static void display(void)
 	cv::Mat originalImage;
 	cap.read(originalImage);
 	const auto& timeCap1 = std::chrono::steady_clock::now();
-	cv::Mat inputImage;
+	static cv::Mat inputImage;	// need to exist longer than interpreter (todo. can be better code...)
 
 	/* Pre-process and Set data to input tensor */
 	const auto& timePre0 = std::chrono::steady_clock::now();
@@ -224,13 +224,15 @@ static void display(void)
 	cv::cvtColor(originalImage, originalImage, cv::COLOR_BGR2RGB);
 	cv::resize(originalImage, inputImage, cv::Size(modelInputWidth, modelInputHeight));
 	if (inputTensor->type == kTfLiteUInt8) {
-		inputImage.convertTo(inputImage, CV_8UC3);
+		//inputImage.convertTo(inputImage, CV_8UC3);
 	} else {
 		inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
 	}
-	static int s_setInputBufferOnce = 0;
-	if (s_setInputBufferOnce++ == 0)
+
+	static int s_setInputBufferOnce = 0;	// call this only once (todo. can be better code...)
+	if (s_setInputBufferOnce++ == 0) {
 		setBufferToTensor(interpreter.get(), interpreter->inputs()[0], (char*)inputImage.data, (int)(inputImage.total() * inputImage.elemSize()));
+	}
 	const auto& timePre1 = std::chrono::steady_clock::now();
 
 	/* Run inference */
@@ -272,7 +274,7 @@ static void display(void)
 	printf("PreProcess time = %.3lf [msec]\n", (timePre1 - timePre0).count() / 1000000.0);
 	printf("PostProcess time = %.3lf [msec]\n", (timePost1 - timePost0).count() / 1000000.0);
 
-	auto& timeFpsNow = std::chrono::steady_clock::now();
+	const auto& timeFpsNow = std::chrono::steady_clock::now();
 	static std::chrono::steady_clock::time_point timeFpsPrevious;
 	double callInterval = (timeFpsNow - timeFpsPrevious).count() / 1000000.0;
 	printf("FPS = %.1lf [fps], (%.3lf [msec])\n", 1000.0 / callInterval, callInterval);
@@ -330,7 +332,7 @@ int main(int argc, char *argv[])
 	displayModelInfo(interpreter.get());
 	
 	/* initialize camera */
-	cap = cv::VideoCapture(1);
+	cap = cv::VideoCapture(0);
 	cap.set(cv::CAP_PROP_FRAME_WIDTH, imageWidth);
 	cap.set(cv::CAP_PROP_FRAME_HEIGHT, imageHeight);
 	// cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('B', 'G', 'R', '3'));

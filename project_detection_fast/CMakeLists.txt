@@ -33,6 +33,7 @@ if(USE_EDGETPU)
 endif()
 
 # For OpenGL and FreeGlut
+# may need this (sudo apt-get install libglu1-mesa-dev freeglut3-dev mesa-common-dev)
 find_package(OpenGL REQUIRED)
 target_link_libraries(${ProjectName} ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
 
