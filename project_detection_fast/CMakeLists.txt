@@ -32,6 +32,16 @@ if(USE_EDGETPU)
 	include(${CMAKE_SOURCE_DIR}/../third_party/cmakes/edgetpu.cmake)
 endif()
 
+# For OpenGL and FreeGlut
+target_include_directories(${ProjectName} PUBLIC ${OPENGL_INCLUDE_DIRS})
+target_link_libraries(${ProjectName} ${OPENGL_LIBRARIES})
+
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+add_definitions(-DFREEGLUT_STATIC)
+add_subdirectory(${CMAKE_SOURCE_DIR}/../third_party/freeglut freeglut)
+target_include_directories(${ProjectName} PUBLIC ${CMAKE_SOURCE_DIR}/../third_party/freeglut/include)
+target_link_libraries(${ProjectName} freeglut_static)
+
 # Copy files
 file(COPY ${CMAKE_SOURCE_DIR}/../resource DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_definitions(-DRESOURCE="resource")

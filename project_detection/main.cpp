@@ -50,7 +50,6 @@ typedef struct {
 	double score;
 } BBox;
 
-static TfLiteQuantization s_inputQuantClone;
 
 /*** Function ***/
 static void displayModelInfo(const tflite::Interpreter* interpreter)
@@ -120,7 +119,7 @@ static TfLiteFloatArray* TfLiteFloatArrayCopy(const TfLiteFloatArray* src) {
 	return ret;
 }
 
-static void setValueToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const int dataSize)
+static void setBufferToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const int dataSize)
 {
 	const TfLiteTensor* inputTensor = interpreter->tensor(index);
 	const int modelInputHeight = inputTensor->dims->data[1];
@@ -129,11 +128,23 @@ static void setValueToTensor(tflite::Interpreter *interpreter, const int index, 
 
 	if (inputTensor->type == kTfLiteUInt8) {
 		TFLITE_MINIMAL_CHECK(sizeof(int8_t) * 1 * modelInputHeight * modelInputWidth * modelInputChannel == dataSize);
+		/* Need deep copy quantization parameters */
+		/* reference: https://github.com/google-coral/edgetpu/blob/master/src/cpp/basic/basic_engine_native.cc */
+		/* todo: release them */
+		const TfLiteAffineQuantization* inputQuantParams = reinterpret_cast<TfLiteAffineQuantization*>(inputTensor->quantization.params);
+		TfLiteQuantization inputQuantClone;
+		inputQuantClone = inputTensor->quantization;
+		TfLiteAffineQuantization* inputQuantParamsClone = reinterpret_cast<TfLiteAffineQuantization*>(malloc(sizeof(TfLiteAffineQuantization)));
+		inputQuantParamsClone->scale = TfLiteFloatArrayCopy(inputQuantParams->scale);
+		inputQuantParamsClone->zero_point = TfLiteIntArrayCopy(inputQuantParams->zero_point);
+		inputQuantParamsClone->quantized_dimension = inputQuantParams->quantized_dimension;
+		inputQuantClone.params = inputQuantParamsClone;
+
 		//memcpy(inputTensor->data.int8, data, sizeof(int8_t) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 		interpreter->SetTensorParametersReadOnly(
 			index, inputTensor->type, inputTensor->name,
 			std::vector<int>(inputTensor->dims->data, inputTensor->dims->data + inputTensor->dims->size),
-			s_inputQuantClone,	// use copied parameters
+			inputQuantClone,	// use copied parameters
 			data, dataSize);
 	} else {
 		TFLITE_MINIMAL_CHECK(sizeof(float) * 1 * modelInputHeight * modelInputWidth * modelInputChannel == dataSize);
@@ -145,6 +156,7 @@ static void setValueToTensor(tflite::Interpreter *interpreter, const int index, 
 			data, sizeof(float) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 	}
 }
+
 
 static void readLabel(const char* filename, std::vector<std::string> & labels)
 {
@@ -223,19 +235,6 @@ int main()
 	const int modelInputHeight = inputTensor->dims->data[1];
 	const int modelInputWidth = inputTensor->dims->data[2];
 
-	if (inputTensor->type == kTfLiteUInt8) {
-		/* Need deep copy quantization parameters */
-		/* reference: https://github.com/google-coral/edgetpu/blob/master/src/cpp/basic/basic_engine_native.cc */
-		/* todo: release them */
-		const TfLiteAffineQuantization* inputQuantParams = reinterpret_cast<TfLiteAffineQuantization*>(inputTensor->quantization.params);
-		s_inputQuantClone = inputTensor->quantization;
-		TfLiteAffineQuantization* inputQuantParamsClone = reinterpret_cast<TfLiteAffineQuantization*>(malloc(sizeof(TfLiteAffineQuantization)));
-		inputQuantParamsClone->scale = TfLiteFloatArrayCopy(inputQuantParams->scale);
-		inputQuantParamsClone->zero_point = TfLiteIntArrayCopy(inputQuantParams->zero_point);
-		inputQuantParamsClone->quantized_dimension = inputQuantParams->quantized_dimension;
-		s_inputQuantClone.params = inputQuantParamsClone;
-	}
-
 	/*** Process for each frame ***/
 	/* Read input image data */
 	cv::Mat originalImage = cv::imread(RESOURCE"/cat_dog.jpg");
@@ -249,7 +248,7 @@ int main()
 	} else {
 		inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
 	}
-	setValueToTensor(interpreter.get(), interpreter->inputs()[0], (char*)inputImage.data, (int)(inputImage.total() * inputImage.elemSize()));
+	setBufferToTensor(interpreter.get(), interpreter->inputs()[0], (char*)inputImage.data, (int)(inputImage.total() * inputImage.elemSize()));
 
 	/* Run inference */
 	TFLITE_MINIMAL_CHECK(interpreter->Invoke() == kTfLiteOk);
