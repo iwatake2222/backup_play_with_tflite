@@ -20,6 +20,7 @@ endif()
 # Create project
 project(${ProjectName})
 add_executable(${ProjectName} main.cpp)
+# add_executable(${ProjectName} main_opengl.cpp)
 
 # For OpenCV
 find_package(OpenCV REQUIRED)
@@ -34,14 +35,14 @@ endif()
 
 # For OpenGL and FreeGlut
 # may need this (sudo apt-get install libglu1-mesa-dev freeglut3-dev mesa-common-dev)
-find_package(OpenGL REQUIRED)
-target_link_libraries(${ProjectName} ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
+# find_package(OpenGL REQUIRED)
+# target_link_libraries(${ProjectName} ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
 
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-add_definitions(-DFREEGLUT_STATIC)
-add_subdirectory(${CMAKE_SOURCE_DIR}/../third_party/freeglut freeglut)
-target_include_directories(${ProjectName} PUBLIC ${CMAKE_SOURCE_DIR}/../third_party/freeglut/include)
-target_link_libraries(${ProjectName} freeglut_static)
+# set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+# add_definitions(-DFREEGLUT_STATIC)
+# add_subdirectory(${CMAKE_SOURCE_DIR}/../third_party/freeglut freeglut)
+# target_include_directories(${ProjectName} PUBLIC ${CMAKE_SOURCE_DIR}/../third_party/freeglut/include)
+# target_link_libraries(${ProjectName} freeglut_static)
 
 # Copy files
 file(COPY ${CMAKE_SOURCE_DIR}/../resource DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
