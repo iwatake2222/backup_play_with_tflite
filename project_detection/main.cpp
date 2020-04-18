@@ -50,6 +50,8 @@ typedef struct {
 	double score;
 } BBox;
 
+static TfLiteQuantization s_inputQuantClone;
+
 /*** Function ***/
 static void displayModelInfo(const tflite::Interpreter* interpreter)
 {
@@ -86,24 +88,61 @@ static void displayModelInfo(const tflite::Interpreter* interpreter)
 	}
 }
 
-static void extractTensorAsFloatVector(const TfLiteTensor* tensor, std::vector<float> &output)
+static void extractTensorAsFloatVector(tflite::Interpreter *interpreter, const int index, std::vector<float> &output)
 {
+	const TfLiteTensor* tensor = interpreter->tensor(index);
 	int dataNum = 1;
 	for (int i = 0; i < tensor->dims->size; i++) {
 		dataNum *= tensor->dims->data[i];
 	}
 	output.resize(dataNum);
 	if (tensor->type == kTfLiteUInt8) {
-		const auto *valUint8 = tensor->data.uint8;
+		const auto *valUint8 = interpreter->typed_tensor<uint8_t>(index);
 		for (int i = 0; i < dataNum; i++) {
 			float valFloat = (valUint8[i] - tensor->params.zero_point) * tensor->params.scale;
 			output[i] = valFloat;
 		}
 	} else {
+		const auto *valFloat = interpreter->typed_tensor<float>(index);
 		for (int i = 0; i < dataNum; i++) {
-			float valFloat = tensor->data.f[i];
-			output[i] = valFloat;
+			output[i] = valFloat[i];
 		}
+	}
+}
+
+static TfLiteFloatArray* TfLiteFloatArrayCopy(const TfLiteFloatArray* src) {
+	if (!src) return nullptr;
+	TfLiteFloatArray* ret = static_cast<TfLiteFloatArray*>(
+		malloc(TfLiteFloatArrayGetSizeInBytes(src->size)));
+	if (!ret) return nullptr;
+	ret->size = src->size;
+	std::memcpy(ret->data, src->data, src->size * sizeof(float));
+	return ret;
+}
+
+static void setValueToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const int dataSize)
+{
+	const TfLiteTensor* inputTensor = interpreter->tensor(index);
+	const int modelInputHeight = inputTensor->dims->data[1];
+	const int modelInputWidth = inputTensor->dims->data[2];
+	const int modelInputChannel = inputTensor->dims->data[3];
+
+	if (inputTensor->type == kTfLiteUInt8) {
+		TFLITE_MINIMAL_CHECK(sizeof(int8_t) * 1 * modelInputHeight * modelInputWidth * modelInputChannel == dataSize);
+		//memcpy(inputTensor->data.int8, data, sizeof(int8_t) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
+		interpreter->SetTensorParametersReadOnly(
+			index, inputTensor->type, inputTensor->name,
+			std::vector<int>(inputTensor->dims->data, inputTensor->dims->data + inputTensor->dims->size),
+			s_inputQuantClone,	// use copied parameters
+			data, dataSize);
+	} else {
+		TFLITE_MINIMAL_CHECK(sizeof(float) * 1 * modelInputHeight * modelInputWidth * modelInputChannel == dataSize);
+		//memcpy(inputTensor->data.f, data, sizeof(float) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
+		interpreter->SetTensorParametersReadOnly(
+			index, inputTensor->type, inputTensor->name,
+			std::vector<int>(inputTensor->dims->data, inputTensor->dims->data + inputTensor->dims->size),
+			inputTensor->quantization,
+			data, sizeof(float) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 	}
 }
 
@@ -183,8 +222,19 @@ int main()
 	const TfLiteTensor* inputTensor = interpreter->input_tensor(0);
 	const int modelInputHeight = inputTensor->dims->data[1];
 	const int modelInputWidth = inputTensor->dims->data[2];
-	const int modelInputChannel = inputTensor->dims->data[3];
 
+	if (inputTensor->type == kTfLiteUInt8) {
+		/* Need deep copy quantization parameters */
+		/* reference: https://github.com/google-coral/edgetpu/blob/master/src/cpp/basic/basic_engine_native.cc */
+		/* todo: release them */
+		const TfLiteAffineQuantization* inputQuantParams = reinterpret_cast<TfLiteAffineQuantization*>(inputTensor->quantization.params);
+		s_inputQuantClone = inputTensor->quantization;
+		TfLiteAffineQuantization* inputQuantParamsClone = reinterpret_cast<TfLiteAffineQuantization*>(malloc(sizeof(TfLiteAffineQuantization)));
+		inputQuantParamsClone->scale = TfLiteFloatArrayCopy(inputQuantParams->scale);
+		inputQuantParamsClone->zero_point = TfLiteIntArrayCopy(inputQuantParams->zero_point);
+		inputQuantParamsClone->quantized_dimension = inputQuantParams->quantized_dimension;
+		s_inputQuantClone.params = inputQuantParamsClone;
+	}
 
 	/*** Process for each frame ***/
 	/* Read input image data */
@@ -192,15 +242,14 @@ int main()
 	cv::Mat inputImage;
 
 	/* Pre-process and Set data to input tensor */
-	cv::cvtColor(originalImage, inputImage, cv::COLOR_BGR2RGB);
-	cv::resize(inputImage, inputImage, cv::Size(modelInputWidth, modelInputHeight));
+	cv::resize(originalImage, inputImage, cv::Size(modelInputWidth, modelInputHeight));
+	cv::cvtColor(inputImage, inputImage, cv::COLOR_BGR2RGB);
 	if (inputTensor->type == kTfLiteUInt8) {
 		inputImage.convertTo(inputImage, CV_8UC3);
-		memcpy(inputTensor->data.int8, inputImage.reshape(0, 1).data, sizeof(int8_t) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 	} else {
 		inputImage.convertTo(inputImage, CV_32FC3, 1.0 / 255);
-		memcpy(inputTensor->data.f, inputImage.reshape(0, 1).data, sizeof(float) * 1 * modelInputWidth * modelInputHeight * modelInputChannel);
 	}
+	setValueToTensor(interpreter.get(), interpreter->inputs()[0], (char*)inputImage.data, (int)(inputImage.total() * inputImage.elemSize()));
 
 	/* Run inference */
 	TFLITE_MINIMAL_CHECK(interpreter->Invoke() == kTfLiteOk);
@@ -210,10 +259,10 @@ int main()
 	std::vector<float> outputClassList;
 	std::vector<float> outputScoreList;
 	std::vector<float> outputNumList;
-	extractTensorAsFloatVector(interpreter->output_tensor(0), outputBoxList);
-	extractTensorAsFloatVector(interpreter->output_tensor(1), outputClassList);
-	extractTensorAsFloatVector(interpreter->output_tensor(2), outputScoreList);
-	extractTensorAsFloatVector(interpreter->output_tensor(3), outputNumList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[0], outputBoxList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[1], outputClassList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[2], outputScoreList);
+	extractTensorAsFloatVector(interpreter.get(), interpreter->outputs()[3], outputNumList);
 	int outputNum = (int)outputNumList[0];
 
 	/* Display bbox */
@@ -238,5 +287,9 @@ int main()
 	printf("Inference time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
 	
 	cv::waitKey(-1);
+
+	model.release();
+	interpreter.release();
+
 	return 0;
 }
