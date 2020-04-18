@@ -274,14 +274,15 @@ static void display(void)
 
 	auto& timeFpsNow = std::chrono::steady_clock::now();
 	static std::chrono::steady_clock::time_point timeFpsPrevious;
-	printf("FPS = %.1lf [fps]\n", 1000000000.0 / (timeFpsNow - timeFpsPrevious).count());
+	double callInterval = (timeFpsNow - timeFpsPrevious).count() / 1000000.0;
+	printf("FPS = %.1lf [fps], (%.3lf [msec])\n", 1000.0 / callInterval, callInterval);
+	printf("========\n");
 	timeFpsPrevious = timeFpsNow;
 }
 
 static void keyboard(unsigned char key, int x, int y)
 {
-	switch (key)
-	{
+	switch (key) {
 	case 'q':
 	case 'Q':
 	case '\033':
@@ -340,10 +341,9 @@ int main(int argc, char *argv[])
 	glutInitDisplayMode(GLUT_RGB);
 	glutInitWindowSize(imageWidth, imageHeight);
 	glutCreateWindow("Window");
-
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	//gluOrtho2D(0.0, imageWidth, imageHeight, 0.0);
+	gluOrtho2D(0.0, imageWidth, 0.0, imageHeight);
 	glViewport(0, 0, imageWidth, imageHeight);
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);

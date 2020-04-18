@@ -33,8 +33,8 @@ if(USE_EDGETPU)
 endif()
 
 # For OpenGL and FreeGlut
-target_include_directories(${ProjectName} PUBLIC ${OPENGL_INCLUDE_DIRS})
-target_link_libraries(${ProjectName} ${OPENGL_LIBRARIES})
+find_package(OpenGL REQUIRED)
+target_link_libraries(${ProjectName} ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_definitions(-DFREEGLUT_STATIC)

@@ -115,6 +115,8 @@ ls ./bazel-bin/tensorflow/lite/tensorflowlite.dll.if.lib
 	- prebuilt libraries are generated from https://github.com/tensorflow/tensorflow 
 - third_party/edgetpu_runtime/
 	- is copied from https://dl.google.com/coral/edgetpu_api/edgetpu_runtime_20200128.zip
+- third_party/freeglut/
+	- http://freeglut.sourceforge.net/
 
 ### Models
 The models are retrieved from:
