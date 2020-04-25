@@ -10,7 +10,7 @@
 ## How to build application code
 ```
 # the following command is needed only once for a system
-sudo apt install curl cmake
+sudo apt install curl cmake libusb-1.0-0-dev
 
 # the following commands are needed only once when you clone the code
 cd EdgeTPU_CPP
