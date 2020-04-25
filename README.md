@@ -4,7 +4,8 @@
 - Jetson Nano + USB Accelerator
 - Raspberry Pi 3,4 + USB Accelerator
 - Linux (x64)
-- Windows (x64)
+- Windows(MSVC) (x64)
+- *Native build only (Cross build is not supported)
 
 ## How to build application code
 ```
@@ -22,10 +23,8 @@ tensorflow/lite/tools/make/download_dependencies.sh
 
 cd ../../project_classification
 mkdir build && cd build
-cmake .. -DUSE_EDGETPU=on							## For x64 PC (Windows, Linux)
-# cmake .. -DARCH_TYPE=armv7   -DUSE_EDGETPU=on		## For Raspberry Pi
-# cmake .. -DARCH_TYPE=aarch64 -DUSE_EDGETPU=on 	## For Jetson Nano, Coral Dev Board
-# cmake .. -DARCH_TYPE=armv7   -DUSE_EDGETPU=off	## without Edge TPU (use TensorflowLite)
+cmake ..	## With Edge TPU
+# cmake .. -DUSE_EDGETPU=off	## without Edge TPU (use TensorflowLite)
 make
 
 ./main
@@ -36,7 +35,7 @@ make
 ```
 
 ### Notice for Windows users
-I noticed running with `Debug` causes exception, so use `Release` or `RelWithDebInfo` in Visual Studio.
+I found running with `Debug` causes exception, so use `Release` or `RelWithDebInfo` in Visual Studio.
 
 
 ## How to create pre-built TensorflowLite library
@@ -109,7 +108,7 @@ ls ./bazel-bin/tensorflow/lite/tensorflowlite.dll
 ls ./bazel-bin/tensorflow/lite/tensorflowlite.dll.if.lib
 ```
 
-## Acknowledge
+## Acknowledgements
 ### External libraries
 - third_party/tensorflow_prebuilt/
 	- prebuilt libraries are generated from https://github.com/tensorflow/tensorflow 

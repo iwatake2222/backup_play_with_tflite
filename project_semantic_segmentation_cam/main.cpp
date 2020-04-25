@@ -110,7 +110,7 @@ static TfLiteFloatArray* TfLiteFloatArrayCopy(const TfLiteFloatArray* src) {
 	return ret;
 }
 
-static void setBufferToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const int dataSize)
+static void setBufferToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const unsigned int dataSize)
 {
 	const TfLiteTensor* inputTensor = interpreter->tensor(index);
 	const int modelInputHeight = inputTensor->dims->data[1];

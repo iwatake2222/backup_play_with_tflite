@@ -118,7 +118,7 @@ static TfLiteFloatArray* TfLiteFloatArrayCopy(const TfLiteFloatArray* src) {
 	return ret;
 }
 
-static void setBufferToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const int dataSize)
+static void setBufferToTensor(tflite::Interpreter *interpreter, const int index, const char *data, const unsigned int dataSize)
 {
 	const TfLiteTensor* inputTensor = interpreter->tensor(index);
 	const int modelInputHeight = inputTensor->dims->data[1];
@@ -179,8 +179,6 @@ static void getBBox(std::vector<BBox> &bboxList, const float *outputBoxList, con
 		float x0 = outputBoxList[4 * i + 1];
 		float y1 = outputBoxList[4 * i + 2];
 		float x1 = outputBoxList[4 * i + 3];
-		float w = x1 - x0 + 1;
-		float h = y1 - y0 + 1;
 		if (imageWidth != 0) {
 			x0 *= imageWidth;
 			x1 *= imageWidth;
@@ -285,7 +283,7 @@ int main(int argc, char *argv[])
 		/* Display bbox */
 		std::vector<BBox> bboxList;
 		getBBox(bboxList, outputBoxList.data(), outputClassList.data(), outputScoreList.data(), outputNum, 0.5, originalImage.cols, originalImage.rows);
-		for (int i = 0; i < bboxList.size(); i++) {
+		for (int i = 0; i < (int)bboxList.size(); i++) {
 			const BBox bbox = bboxList[i];
 			cv::rectangle(originalImage, cv::Rect((int)bbox.x, (int)bbox.y, (int)bbox.w, (int)bbox.h), cv::Scalar(255, 255, 0));
 			cv::putText(originalImage, labels[bbox.classId], cv::Point((int)bbox.x, (int)bbox.y), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
