@@ -29,7 +29,6 @@ make
 
 ./main
 # cp ../../third_party/edgetpu/libedgetpu/direct/armv7a/libedgetpu.so.1.0 libedgetpu.so.1
-# mv libedgetpu.so.1.0 libedgetpu.so.1
 # sudo LD_LIBRARY_PATH=./ ./main
 
 ```

@@ -34,6 +34,9 @@ set(BUILD_TESTING OFF CACHE BOOL "disable BUILD_TESTING for absl" FORCE)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../abseil-cpp absl)
 set(ABSL_LIBS absl_synchronization absl_stacktrace absl_symbolize absl_demangle_internal absl_debugging_internal absl_dynamic_annotations absl_time absl_time_zone absl_graphcycles_internal absl_failure_signal_handler absl_malloc_internal absl_base absl_spinlock_wait)
 target_link_libraries(${coral_pipeline} ${ABSL_LIBS})
+if(NOT WIN32)
+	target_link_libraries(${coral_pipeline} atomic)
+endif()
 
 # Use the library from main project
 target_link_libraries(${ProjectName} ${coral_pipeline})
