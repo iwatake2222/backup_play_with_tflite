@@ -43,6 +43,12 @@
   }
 
 
+enum class EdgeTpuType {
+	kAny,
+	kPciOnly,
+	kUsbOnly,
+};
+
 /*** Function ***/
 static void displayModelInfo(const tflite::Interpreter* interpreter)
 {
@@ -112,7 +118,79 @@ static void readLabel(const char* filename, std::vector<std::string> & labels)
 		labels.push_back(str);
 	}
 }
+std::vector<std::shared_ptr<edgetpu::EdgeTpuContext>> PrepareEdgeTpuContexts(
+	int num_tpus, EdgeTpuType device_type) {
+	auto get_available_tpus = [](EdgeTpuType device_type) {
+		const auto& all_tpus =
+			edgetpu::EdgeTpuManager::GetSingleton()->EnumerateEdgeTpu();
+		if (device_type == EdgeTpuType::kAny) {
+			return all_tpus;
+		} else {
+			std::vector<edgetpu::EdgeTpuManager::DeviceEnumerationRecord> result;
 
+			edgetpu::DeviceType target_type;
+			if (device_type == EdgeTpuType::kPciOnly) {
+				target_type = edgetpu::DeviceType::kApexPci;
+			} else if (device_type == EdgeTpuType::kUsbOnly) {
+				target_type = edgetpu::DeviceType::kApexUsb;
+			} else {
+				std::cerr << "Invalid device type" << std::endl;
+				return result;
+			}
+
+			for (const auto& tpu : all_tpus) {
+				if (tpu.type == target_type) {
+					result.push_back(tpu);
+				}
+			}
+
+			return result;
+		}
+	};
+
+	const auto& available_tpus = get_available_tpus(device_type);
+	if (available_tpus.size() < num_tpus) {
+		std::cerr << "Not enough Edge TPU detected, expected: " << num_tpus
+			<< " actual: " << available_tpus.size();
+		return {};
+	}
+
+	std::unordered_map<std::string, std::string> options = {
+		{"Usb.MaxBulkInQueueLength", "8"},
+	};
+
+	std::vector<std::shared_ptr<edgetpu::EdgeTpuContext>> edgetpu_contexts(
+		num_tpus);
+	for (int i = 0; i < num_tpus; ++i) {
+		edgetpu_contexts[i] = edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice(
+			available_tpus[i].type, available_tpus[i].path, options);
+		std::cout << "Device " << available_tpus[i].path << " is selected."
+			<< std::endl;
+	}
+
+	return edgetpu_contexts;
+}
+std::unique_ptr<tflite::Interpreter> BuildEdgeTpuInterpreter(
+	const tflite::FlatBufferModel& model, edgetpu::EdgeTpuContext* context) {
+	tflite::ops::builtin::BuiltinOpResolver resolver;
+	resolver.AddCustom(edgetpu::kCustomOp, edgetpu::RegisterCustomOp());
+
+	std::unique_ptr<tflite::Interpreter> interpreter;
+	tflite::InterpreterBuilder interpreter_builder(model.GetModel(), resolver);
+	if (interpreter_builder(&interpreter) != kTfLiteOk) {
+		std::cerr << "Error in interpreter initialization." << std::endl;
+		return nullptr;
+	}
+
+	interpreter->SetExternalContext(kTfLiteEdgeTpuContext, context);
+	interpreter->SetNumThreads(1);
+	if (interpreter->AllocateTensors() != kTfLiteOk) {
+		std::cerr << "Failed to allocate tensors." << std::endl;
+		return nullptr;
+	}
+
+	return interpreter;
+}
 
 int main()
 {
@@ -123,10 +201,22 @@ int main()
 
 	/* Create interpreters */
 	int num_segments = 2;
+	auto contexts = PrepareEdgeTpuContexts(num_segments, EdgeTpuType::kAny);
+
+	std::vector<std::unique_ptr<tflite::Interpreter>> managed_interpreters(num_segments);
 	std::vector<tflite::Interpreter*> interpreters(num_segments);
 	std::vector<std::unique_ptr<tflite::FlatBufferModel>> models(num_segments);
-	models[0] = tflite::FlatBufferModel::BuildFromFile("resource/deeplabv3_mnv2_dm05_pascal_quant_segment_0_of_2_edgetpu.tflite");
-	models[1] = tflite::FlatBufferModel::BuildFromFile("resource/deeplabv3_mnv2_dm05_pascal_quant_segment_1_of_2_edgetpu.tflite");
+	models[0] = tflite::FlatBufferModel::BuildFromFile("resource/inception_v3_299_quant_segment_0_of_2_edgetpu.tflite");
+	models[1] = tflite::FlatBufferModel::BuildFromFile("resource/inception_v3_299_quant_segment_1_of_2_edgetpu.tflite");
+
+	for (int i = 0; i < num_segments; ++i) {
+		managed_interpreters[i] =
+			BuildEdgeTpuInterpreter(*(models[i]), contexts[i].get());
+		if (managed_interpreters[i] == nullptr) {
+			return 1;
+		}
+		interpreters[i] = managed_interpreters[i].get();
+	}
 
 	std::unique_ptr<coral::PipelinedModelRunner> runner(
 		new coral::PipelinedModelRunner(interpreters));
