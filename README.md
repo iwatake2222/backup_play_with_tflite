@@ -38,6 +38,8 @@ I found running with `Debug` causes exception, so use `Release` or `RelWithDebIn
 
 
 ## How to create pre-built TensorflowLite library
+pre-built TensorflowLite library is stored in `third_party/tensorflow_prebuilt` . Please use the following commands if you want to build them by yourself.
+
 ### Common
 ```
 git clone https://github.com/tensorflow/tensorflow.git

@@ -23,11 +23,17 @@
 
 /*** Macro ***/
 /* Model parameters */
+//#define MODEL_SEGMENTS_NUM 3
+//#define MODEL_FILENAME_BASE RESOURCE"/mobilenet_v2_1.0_224_quant"
+//#define LABEL_NAME          RESOURCE"/imagenet_labels.txt"
+//#define MODEL_WIDTH 224
+//#define MODEL_HEIGHT 224
+
 #define MODEL_SEGMENTS_NUM 3
-#define MODEL_FILENAME_BASE RESOURCE"/mobilenet_v2_1.0_224_quant"
+#define MODEL_FILENAME_BASE RESOURCE"/inception_v3_quant"
 #define LABEL_NAME          RESOURCE"/imagenet_labels.txt"
-#define MODEL_WIDTH 224
-#define MODEL_HEIGHT 224
+#define MODEL_WIDTH 299
+#define MODEL_HEIGHT 299
 
 /* Settings */
 #define LOOP_NUM_FOR_TIME_MEASUREMENT 100
