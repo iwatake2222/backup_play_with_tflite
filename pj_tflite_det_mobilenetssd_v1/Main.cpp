@@ -14,9 +14,9 @@
 
 /*** Macro ***/
 /* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/mobilenet_v2_1.0_224_quant"
-#define LABEL_NAME   RESOURCE_DIR"/model/imagenet_labels.txt"
-#define IMAGE_NAME   RESOURCE_DIR"/parrot.jpg"
+#define MODEL_NAME   RESOURCE_DIR"/model/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29"
+#define LABEL_NAME   RESOURCE_DIR"/model/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.txt"
+#define IMAGE_NAME   RESOURCE_DIR"/cat_dog.jpg"
 
 /* Settings */
 #define TEST_SPEED_ONLY

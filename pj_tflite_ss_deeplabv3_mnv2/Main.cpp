@@ -14,9 +14,9 @@
 
 /*** Macro ***/
 /* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/mobilenet_v2_1.0_224_quant"
-#define LABEL_NAME   RESOURCE_DIR"/model/imagenet_labels.txt"
-#define IMAGE_NAME   RESOURCE_DIR"/parrot.jpg"
+#define MODEL_NAME   RESOURCE_DIR"/model/deeplabv3_mnv2_dm05_pascal_quant"
+#define LABEL_NAME   RESOURCE_DIR"/model/label_PASCAL_VOC2012.txt"
+#define IMAGE_NAME   RESOURCE_DIR"/cat.jpg"
 
 /* Settings */
 #define TEST_SPEED_ONLY

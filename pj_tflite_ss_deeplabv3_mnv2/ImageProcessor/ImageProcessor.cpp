@@ -31,6 +31,16 @@
 static const float PIXEL_MEAN[3] = { 0.5f, 0.5f, 0.5f };
 static const float PIXEL_STD[3] = { 0.25f,  0.25f, 0.25f };
 
+typedef struct {
+	double x;
+	double y;
+	double w;
+	double h;
+	int classId;
+	std::string classIdName;
+	double score;
+} BBox;
+
 /*** Global variable ***/
 static std::vector<std::string> s_labels;
 static InferenceHelper *s_inferenceHelper;
@@ -59,10 +69,8 @@ int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 	s_inputTensor = new TensorInfo();
 	s_outputTensor = new TensorInfo();
 
-	s_inferenceHelper->getTensorByName("input", s_inputTensor);
-	//s_inferenceHelper->getTensorByName("MobilenetV2/Predictions/Reshape_1", s_outputTensor);
-	s_inferenceHelper->getTensorByName("MobilenetV2/Predictions/Softmax", s_outputTensor);
-
+	s_inferenceHelper->getTensorByName("MobilenetV2/MobilenetV2/input", s_inputTensor);
+	s_inferenceHelper->getTensorByName("ArgMax", s_outputTensor);
 
 	/* read label */
 	readLabel(inputParam->labelFilename, s_labels);
@@ -105,28 +113,40 @@ int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 
 	/*** PostProcess ***/
 	/* Retrieve the result */
-	std::vector<float> outputScoreList;
-	outputScoreList.resize(s_outputTensor->dims[1]);
-	const float* valFloat = s_outputTensor->getDataAsFloat();
-	for (int i = 0; i < outputScoreList.size(); i++) {
-		outputScoreList[i] = valFloat[i];
+	int modelOutputWidth = s_outputTensor->dims[2];
+	int modelOutputHeight = s_outputTensor->dims[1];
+	//int modelOutputChannel = s_outputTensor->dims[3];
+	const int64_t *outputMap = (int64_t*)s_outputTensor->data;
+	cv::Mat outputImage = cv::Mat::zeros(modelOutputHeight, modelOutputWidth, CV_8UC3);
+	for (int y = 0; y < modelOutputHeight; y++) {
+		for (int x = 0; x < modelOutputWidth; x++) {
+			//int maxChannel = 0;
+			//float maxValue = 0;
+			//for (int c = 0; c < modelOutputChannel; c++) {
+			//	float value = outputMap[y * (modelOutputWidth * modelOutputChannel) + x * modelOutputChannel + c];
+			//	if (value > maxValue) {
+			//		maxValue = value;
+			//		maxChannel = c;
+			//	}
+			//}
+			int maxChannel = outputMap[y * modelOutputWidth + x];
+			float colorRatioB = (maxChannel % 2 + 1) / 2.0f;
+			float colorRatioG = (maxChannel % 3 + 1) / 3.0f;
+			float colorRatioR = (maxChannel % 4 + 1) / 4.0f;
+			outputImage.data[(y * modelOutputWidth + x) * 3 + 0] = (int)(255 * colorRatioB);
+			outputImage.data[(y * modelOutputWidth + x) * 3 + 1] = (int)(255 * colorRatioG);
+			outputImage.data[(y * modelOutputWidth + x) * 3 + 2] = (int)(255 * (1 - colorRatioR));
+
+		}
 	}
 
-	/* Find the max score */
-	int maxIndex = (int)(std::max_element(outputScoreList.begin(), outputScoreList.end()) - outputScoreList.begin());
-	auto maxScore = *std::max_element(outputScoreList.begin(), outputScoreList.end());
-	PRINT("Result = %s (%d) (%.3f)\n", s_labels[maxIndex].c_str(), maxIndex, maxScore);
+	/* Display result */
+	cv::resize(outputImage, outputImage, mat->size());
+	cv::add(*mat, outputImage, *mat);
 
-	/* Draw the result */
-	std::string resultStr;
-	resultStr = "Result:" + s_labels[maxIndex] + " (score = " + std::to_string(maxScore) + ")";
-	cv::putText(*mat, resultStr, cv::Point(10, 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
-	cv::putText(*mat, resultStr, cv::Point(10, 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1);
 
 	/* Return the results */
-	outputParam->classId = maxIndex;
-	snprintf(outputParam->label, sizeof(outputParam->label), s_labels[maxIndex].c_str());
-	outputParam->score = maxScore;
+	outputParam->dummy = 0;
 	
 	return 0;
 }

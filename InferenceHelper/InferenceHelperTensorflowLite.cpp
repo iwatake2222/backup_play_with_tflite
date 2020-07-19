@@ -67,7 +67,7 @@ int InferenceHelperTensorflowLite::inference(void)
 }
 
 
-int InferenceHelperTensorflowLite::getTensorByName(const char *name, TENSOR_INFO *tensorInfo)
+int InferenceHelperTensorflowLite::getTensorByName(const char *name, TensorInfo *tensorInfo)
 {
 	int index = getIndexByName(name);
 	if (index == -1) {
@@ -78,36 +78,34 @@ int InferenceHelperTensorflowLite::getTensorByName(const char *name, TENSOR_INFO
 	return getTensorByIndex(index, tensorInfo);
 }
 
-int InferenceHelperTensorflowLite::getTensorByIndex(const int index, TENSOR_INFO *tensorInfo)
+int InferenceHelperTensorflowLite::getTensorByIndex(const int index, TensorInfo *tensorInfo)
 {
 	const TfLiteTensor* tensor = m_interpreter->tensor(index);
 
 	tensorInfo->index = index;
 
-	tensorInfo->height = 1;
-	tensorInfo->width = 1;
-	tensorInfo->channel = 1;
-	if (tensor->dims->size > 1) tensorInfo->height = tensor->dims->data[1];
-	if (tensor->dims->size > 2) tensorInfo->width = tensor->dims->data[2];
-	if (tensor->dims->size > 3) tensorInfo->channel = tensor->dims->data[3];
+	for (int i = 0; i < tensor->dims->size; i++) {
+		tensorInfo->dims.push_back(tensor->dims->data[i]);
+	}
+
 
 	switch (tensor->type) {
 	case kTfLiteUInt8:
-		tensorInfo->type = TENSOR_TYPE_UINT8;
+		tensorInfo->type = TensorInfo::TENSOR_TYPE_UINT8;
 		tensorInfo->data = m_interpreter->typed_tensor<uint8_t>(index);
 		tensorInfo->quant.scale = tensor->params.scale;
 		tensorInfo->quant.zeroPoint = tensor->params.zero_point;
 		break;
 	case kTfLiteFloat32:
-		tensorInfo->type = TENSOR_TYPE_FP32;
+		tensorInfo->type = TensorInfo::TENSOR_TYPE_FP32;
 		tensorInfo->data = m_interpreter->typed_tensor<float>(index);
 			break;
 	case kTfLiteInt32:
-		tensorInfo->type = TENSOR_TYPE_INT32;
+		tensorInfo->type = TensorInfo::TENSOR_TYPE_INT32;
 		tensorInfo->data = m_interpreter->typed_tensor<int32_t>(index);
 		break;
 	case kTfLiteInt64:
-		tensorInfo->type = TENSOR_TYPE_INT64;
+		tensorInfo->type = TensorInfo::TENSOR_TYPE_INT64;
 		tensorInfo->data = m_interpreter->typed_tensor<int64_t>(index);
 		break;
 	default:
@@ -206,6 +204,7 @@ void InferenceHelperTensorflowLite::displayModelInfo(const tflite::Interpreter* 
 	PRINT("Input num = %d\n", inputNum);
 	for (int i = 0; i < inputNum; i++) {
 		auto* tensor = interpreter->tensor(inputIndices[i]);
+		PRINT("    tensor[%d]->name: %s\n", i, tensor->name);
 		for (int j = 0; j < tensor->dims->size; j++) {
 			PRINT("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
 		}
@@ -222,6 +221,7 @@ void InferenceHelperTensorflowLite::displayModelInfo(const tflite::Interpreter* 
 	PRINT("Output num = %d\n", outputNum);
 	for (int i = 0; i < outputNum; i++) {
 		auto* tensor = interpreter->tensor(outputIndices[i]);
+		PRINT("    tensor[%d]->name: %s\n", i, tensor->name);
 		for (int j = 0; j < tensor->dims->size; j++) {
 			PRINT("    tensor[%d]->dims->size[%d]: %d\n", i, j, tensor->dims->data[j]);
 		}

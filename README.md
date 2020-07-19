@@ -244,3 +244,10 @@ You need to install Android SDK and Android NDK beforehand, then specify the pat
 		- http://download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224_quant.tgz
 		- https://coral.withgoogle.com/models/
 		- https://www.tensorflow.org/lite/guide/hosted_models
+	- coco_ssd_mobilenet_v1_1.0_quant_2018_06_29
+		- https://www.tensorflow.org/lite/models/object_detection/overview
+		- https://storage.googleapis.com/download.tensorflow.org/models/tflite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.zip
+	- deeplabv3_mnv2_dm05_pascal_quant
+		- https://github.com/google-coral/edgetpu/tree/master/test_data
+		- https://github.com/google-coral/edgetpu/blob/master/test_data/deeplabv3_mnv2_dm05_pascal_quant.tflite
+		- https://github.com/google-coral/edgetpu/blob/master/test_data/deeplabv3_mnv2_dm05_pascal_quant_edgetpu.tflite

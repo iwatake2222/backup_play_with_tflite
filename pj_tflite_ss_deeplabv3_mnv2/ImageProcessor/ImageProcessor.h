@@ -6,6 +6,7 @@ namespace cv {
 	class Mat;
 };
 
+#define NUM_MAX_RESULT 100
 
 typedef struct {
 	char modelFilename[256];
@@ -14,9 +15,7 @@ typedef struct {
 } INPUT_PARAM;
 
 typedef struct {
-	int classId;
-	char label[256];
-	double score;
+	int dummy;
 } OUTPUT_PARAM;
 
 int ImageProcessor_initialize(const INPUT_PARAM *inputParam);
