@@ -4,15 +4,24 @@ Sample projects to use Tensorflow Lite for multi-platform
 ## Target Environment
 - Platform
 	- Linux (x64)
+		- Tested in Xubuntu 18 in VirtualBox in Windows 10
 	- Linux (armv7)
+		- Tested in Raspberry Pi4 (Raspbian 32-bit)
 	- Linux (aarch64)
+		- Tested in Jetson Nano (JetPack 4.3)
 	- Android (armv7)
+		- not tested yet
 	- Android (aarch64)
+		- not tested yet
 	- Windows (x64). Visual Studio 2017
+		- Tested in Windows10 64-bit
 	- (Only native build is supported)
-- Delegate (todo)
+
+- Delegate
 	- Edge TPU
-	- GPU
+		- Tested in Raspberry Pi (armv7) and Jetson Nano (aarch64)
+		- Crash happend in Jetson Xavier NX for some reasons...
+	- GPU (todo)
 
 ## How to build application
 ### Common (Get source code)
@@ -29,7 +38,7 @@ tensorflow/lite/tools/make/download_dependencies.sh
 
 ### Windows (Visual Studio)
 - Configure and Generate a new project using cmake-gui for Visual Studio 2017 64-bit
-	- `Where is the source code` : path-to-play_with_tflite/pj_tflite_standalone_cls_mobilenet_v2	(for example)
+	- `Where is the source code` : path-to-play_with_tflite/pj_tflite_cls_mobilenet_v2	(for example)
 	- `Where to build the binaries` : path-to-build	(any)
 - Open `main.sln`
 - Set `main` project as a startup project, then build and run!
@@ -39,26 +48,39 @@ I found running with `Debug` causes exception, so use `Release` or `RelWithDebIn
 
 ### Linux (PC Ubuntu, Raspberry Pi, Jetson Nano, etc.)
 ```sh
-cd pj_tflite_standalone_cls_mobilenet_v2   # for example
+cd pj_tflite_cls_mobilenet_v2   # for example
 mkdir build && cd build
 cmake ..
 make
 ./main
 ```
+### Option (Camera input)
+```sh
+cmake .. -DSPEED_TEST_ONLY=off
+```
+
+### Options (Edge TPU)
+```sh
+cmake .. -DTFLITE_DELEGATE_EDGETPU=on
+make
+cp libedgetpu.so.1.0 libedgetpu.so.1
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`
+sudo LD_LIBRARY_PATH=./ ./main
+```
 
 ## How to create pre-built TensorflowLite library
-Pre-built TensorflowLite libraries are stored in `third_party/tensorflow_prebuilt` . You can use them, but if you want to build them by yourself, please use the following commands.
+Pre-built TensorflowLite libraries are stored in `third_party/tensorflow_prebuilt` . If you want to build them by yourself, please use the following commands.
 
 ### Common (Get source code)
 ```sh
 git clone https://github.com/tensorflow/tensorflow.git
 cd tensorflow
 git checkout r2.3
-# git checkout bb3c460114b13fda5c730fe43587b8e8c2243cd7  # This is a version I used to generate the libraries
+# git checkout bb3c460114b13fda5c730fe43587b8e8c2243cd7  # This is the version I used to generate the libraries
 ```
 
 ### For Linux
-You can create libtensorflow.so for x64, armv7 and aarch64. You can use the following commands in PC Linux like Ubuntu.
+You can create libtensorflow.so for x64, armv7 and aarch64 using the following commands in PC Linux like Ubuntu.
 
 - Install tools (Bazel and Python)
 	```sh
@@ -129,11 +151,11 @@ You can create libtensorflow.so for x64, armv7 and aarch64. You can use the foll
 		```
 
 ### For Windows
-You can create libtensorflow.so(it's actually dll) for Windows. You can use the following commands in Windows 10 with Visual Studio. I used Visual Studio 2017 (You don't need to specify toolchain path. Bazel will automatically find it).
+You can create libtensorflow.so(it's actually dll) for Windows using the following commands in Windows 10 with Visual Studio. I used Visual Studio 2017 (You don't need to specify toolchain path. Bazel will automatically find it).
 
 - Modify setting for bazel (workaround)
 	- Reference: https://github.com/tensorflow/tensorflow/issues/28824#issuecomment-536669038
-	- Edit `WORKSPACE` file just under the top layer of tensorflow
+	- Edit `WORKSPACE` file just under the top directory of tensorflow repo
 	```
 	$ git diff
 	diff --git a/WORKSPACE b/WORKSPACE
@@ -157,7 +179,7 @@ You can create libtensorflow.so(it's actually dll) for Windows. You can use the 
 	```
 
 - Install tools
-	- Install a environment providing linux like system (e.g. msys)
+	- Install an environment providing linux commands (e.g. msys)
 		- Add `C:\msys64\usr\bin` to Windows path
 	- Install python environment (e.g. miniconda)
 	- Install bazel (e.g. locate the bazel executable file into `C:\bin` )
@@ -172,8 +194,8 @@ You can create libtensorflow.so(it's actually dll) for Windows. You can use the 
 		pip install python
 		pip install numpy
 		```
-	- `cd path-to-tensorflow`
 	```sh
+	cd path-to-tensorflow
 	python configure.py 
 	```
 - Build
@@ -227,6 +249,55 @@ You need to install Android SDK and Android NDK beforehand, then specify the pat
 	--copt -DTFLITE_GPU_BINARY_RELEASE `
 	--strip always 
 	```
+
+## How to create pre-built EdgeTPU library
+The official libraries for EdgeTPU are stored in `third_party/edgetpu/libedgetpu` . However, you need to use the same tflite version as used in EdgeTPU library build. Since I use r2.3 branch here, I built my own libraries for EdgeTPU using tensorflow r2.3. They are stored in `third_party/edgetpu_prebuilt` , and the projects link these libraries.
+If you want to build them by yourself, please follow the steps below.
+
+### Common (Get source code)
+```sh
+git clone https://github.com/google-coral/libedgetpu.git
+cd libedgetpu
+# git checkout f8cac1044e3ca32b6a9c8712ac6d063e58f19fe1  # This is the version I used to generate the libraries
+```
+
+- Modify setting for bazel to specify tensorflow version
+	- Edit `WORKSPACE` file just under the top directory of tensorflow repo
+	- The version must be the same as tensorflow lite you want to use
+	```
+	diff --git a/bazel/WORKSPACE b/bazel/WORKSPACE
+	index f9cb049..ec735c4 100644
+	--- a/bazel/WORKSPACE
+	+++ b/bazel/WORKSPACE
+	@@ -36,9 +36,9 @@ http_archive(
+	# repo WORKSPACE file.
+	# TODO: figure out a way to keep single source of truth of the
+	# TF commit # used.
+	-TENSORFLOW_COMMIT = "f394a768719a55b5c351ed1ecab2ec6f16f99dd4";
+	+TENSORFLOW_COMMIT = "bb3c460114b13fda5c730fe43587b8e8c2243cd7";
+	# Command to calculate: curl -OL <FILE-URL> | sha256sum | awk '{print $1}'
+	-TENSORFLOW_SHA256 = "cb286abee7ee9cf5c8701d85fcc88f0fd59e72492ec4f254156de486e3e905c1"
+	+TENSORFLOW_SHA256 = "1d358199ea52d38524311dee2fb8f08a5c4c444bd0fcd8a1fe2209cac47afffb"
+	http_archive(
+		name = "org_tensorflow",
+		sha256 = TENSORFLOW_SHA256,
+	```
+
+
+### For Linux
+You can create `libedgetpu.so.1.0` for x64, armv7 and aarch64 using the following commands in PC Linux like Ubuntu.
+
+```sh
+DOCKER_CPUS="k8 armv7a aarch64" DOCKER_TARGETS=libedgetpu make docker-build
+```
+
+### For Windows (WIP)
+- Download `https://github.com/libusb/libusb/releases/download/v1.0.22/libusb-1.0.22.7z` and extract it the same directory level as libedgetpu. (This is mentioned in `WORKSPACE.windows` )
+- Resave `usb_driver.cc` as UTF-8 with BOM (???)
+- Set dumpbin to Windows Path
+	- e.g.: `Set-Item Env:Path "$Env:Path;C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\bin\Hostx64\x64"`
+- Run `build.bat` in python terminal like miniconda
+- Build fails so far. If I don't change TENSORFLOW_COMMIT, everything is okay thuogh...
 
 ## Acknowledgement
 - References:

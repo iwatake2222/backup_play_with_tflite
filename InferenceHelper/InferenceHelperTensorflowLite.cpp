@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <string>
 
+#ifdef TFLITE_DELEGATE_EDGETPU
+#include "edgetpu.h"
+#include "edgetpu_c.h"
+#endif
+
 #include "InferenceHelperTensorflowLite.h"
 
 /*** Macro ***/
@@ -35,14 +40,18 @@ int InferenceHelperTensorflowLite::initialize(const char *modelFilename, int num
 	CHECK(m_interpreter != nullptr);
 
 	m_interpreter->SetNumThreads(numThreads);
-#ifdef USE_EDGETPU_DELEGATE
-	size_t num_devices;
-	std::unique_ptr<edgetpu_device, decltype(&edgetpu_free_devices)> devices(edgetpu_list_devices(&num_devices), &edgetpu_free_devices);
-	TFLITE_MINIMAL_CHECK(num_devices > 0);
-	const auto& device = devices.get()[0];
-	auto* delegate = edgetpu_create_delegate(device.type, device.path, nullptr, 0);
-	m_interpreter->ModifyGraphWithDelegate({ delegate, edgetpu_free_delegate });
+
+#ifdef TFLITE_DELEGATE_EDGETPU
+	if (m_helperType == TENSORFLOW_LITE_EDGETPU) {
+		size_t num_devices;
+		std::unique_ptr<edgetpu_device, decltype(&edgetpu_free_devices)> devices(edgetpu_list_devices(&num_devices), &edgetpu_free_devices);
+		CHECK(num_devices > 0);
+		const auto& device = devices.get()[0];
+		auto* delegate = edgetpu_create_delegate(device.type, device.path, nullptr, 0);
+		m_interpreter->ModifyGraphWithDelegate({ delegate, edgetpu_free_delegate });
+	}
 #endif
+
 	CHECK(m_interpreter->AllocateTensors() == kTfLiteOk);
 
 

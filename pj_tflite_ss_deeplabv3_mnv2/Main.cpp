@@ -13,13 +13,10 @@
 #include "ImageProcessor.h"
 
 /*** Macro ***/
-/* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/deeplabv3_mnv2_dm05_pascal_quant"
-#define LABEL_NAME   RESOURCE_DIR"/model/label_PASCAL_VOC2012.txt"
+#define WORK_DIR     RESOURCE_DIR"/model/"
 #define IMAGE_NAME   RESOURCE_DIR"/cat.jpg"
 
 /* Settings */
-#define TEST_SPEED_ONLY
 #define LOOP_NUM_FOR_TIME_MEASUREMENT 10
 
 int main()
@@ -27,12 +24,11 @@ int main()
 	/*** Initialize ***/
 	/* Initialize image processor library */
 	INPUT_PARAM inputParam;
-	snprintf(inputParam.modelFilename, sizeof(inputParam.modelFilename), MODEL_NAME);
-	snprintf(inputParam.labelFilename, sizeof(inputParam.labelFilename), LABEL_NAME);
+	snprintf(inputParam.workDir, sizeof(inputParam.workDir), WORK_DIR);
 	inputParam.numThreads = 4;
 	ImageProcessor_initialize(&inputParam);
 
-#ifdef TEST_SPEED_ONLY
+#ifdef SPEED_TEST_ONLY
 	/* Read an input image */
 	cv::Mat originalImage = cv::imread(IMAGE_NAME);
 
@@ -50,7 +46,7 @@ int main()
 	}
 	const auto& t1 = std::chrono::steady_clock::now();
 	std::chrono::duration<double> timeSpan = t1 - t0;
-	printf("Inference time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
+	printf("Image processing time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
 	cv::waitKey(-1);
 
 #else

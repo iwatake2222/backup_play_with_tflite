@@ -8,8 +8,7 @@ namespace cv {
 
 
 typedef struct {
-	char modelFilename[256];
-	char labelFilename[256];
+	char workDir[256];
 	int  numThreads;
 } INPUT_PARAM;
 

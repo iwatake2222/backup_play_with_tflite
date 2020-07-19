@@ -27,7 +27,13 @@
 	exit(1);                                                 \
   }
 
-/* Setting */
+/* Model parameters */
+#ifdef TFLITE_DELEGATE_EDGETPU
+#define MODEL_NAME   "mobilenet_v2_1.0_224_quant_edgetpu"
+#else
+#define MODEL_NAME   "mobilenet_v2_1.0_224_quant"
+#endif
+#define LABEL_NAME   "imagenet_labels.txt"
 static const float PIXEL_MEAN[3] = { 0.5f, 0.5f, 0.5f };
 static const float PIXEL_STD[3] = { 0.25f,  0.25f, 0.25f };
 
@@ -54,8 +60,16 @@ static void readLabel(const char* filename, std::vector<std::string> & labels)
 
 int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 {
+#ifdef TFLITE_DELEGATE_EDGETPU
+	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU);
+#else
 	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE);
-	s_inferenceHelper->initialize(inputParam->modelFilename, inputParam->numThreads);
+#endif
+
+	std::string modelFilename = std::string(inputParam->workDir) + "/" + MODEL_NAME;
+	std::string labelFilename = std::string(inputParam->workDir) + "/" + LABEL_NAME;
+
+	s_inferenceHelper->initialize(modelFilename.c_str(), inputParam->numThreads);
 	s_inputTensor = new TensorInfo();
 	s_outputTensor = new TensorInfo();
 
@@ -65,7 +79,7 @@ int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 
 
 	/* read label */
-	readLabel(inputParam->labelFilename, s_labels);
+	readLabel(labelFilename.c_str(), s_labels);
 
 	return 0;
 }
@@ -108,7 +122,7 @@ int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 	std::vector<float> outputScoreList;
 	outputScoreList.resize(s_outputTensor->dims[1]);
 	const float* valFloat = s_outputTensor->getDataAsFloat();
-	for (int i = 0; i < outputScoreList.size(); i++) {
+	for (int i = 0; i < (int)outputScoreList.size(); i++) {
 		outputScoreList[i] = valFloat[i];
 	}
 

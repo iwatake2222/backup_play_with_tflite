@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string>
 #include <fstream>
-
+#include <vector>
 
 /* for OpenCV */
 #include <opencv2/opencv.hpp>
@@ -27,7 +27,13 @@
 	exit(1);                                                 \
   }
 
-/* Setting */
+/* Model parameters */
+#ifdef TFLITE_DELEGATE_EDGETPU
+#define MODEL_NAME   "coco_ssd_mobilenet_v1_1.0_quant_2018_06_29_edgetpu"
+#else
+#define MODEL_NAME   "coco_ssd_mobilenet_v1_1.0_quant_2018_06_29"
+#endif
+#define LABEL_NAME   "coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.txt"
 static const float PIXEL_MEAN[3] = { 0.5f, 0.5f, 0.5f };
 static const float PIXEL_STD[3] = { 0.25f,  0.25f, 0.25f };
 
@@ -95,8 +101,17 @@ static void readLabel(const char* filename, std::vector<std::string> & labels)
 
 int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 {
+#ifdef TFLITE_DELEGATE_EDGETPU
+	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU);
+#else
 	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE);
-	s_inferenceHelper->initialize(inputParam->modelFilename, inputParam->numThreads);
+#endif
+
+	std::string modelFilename = std::string(inputParam->workDir) + "/" + MODEL_NAME;
+	std::string labelFilename = std::string(inputParam->workDir) + "/" + LABEL_NAME;
+
+	s_inferenceHelper->initialize(modelFilename.c_str(), inputParam->numThreads);
+
 	s_inputTensor = new TensorInfo();
 	s_outputTensorBBox = new TensorInfo();
 	s_outputTensorClass = new TensorInfo();
@@ -110,7 +125,7 @@ int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 	s_inferenceHelper->getTensorByName("TFLite_Detection_PostProcess:3", s_outputTensorNum);
 
 	/* read label */
-	readLabel(inputParam->labelFilename, s_labels);
+	readLabel(labelFilename.c_str(), s_labels);
 
 	return 0;
 }
