@@ -8,7 +8,7 @@ Sample projects to use Tensorflow Lite for multi-platform
 	- Linux (armv7)
 		- Tested in Raspberry Pi4 (Raspbian 32-bit)
 	- Linux (aarch64)
-		- Tested in Jetson Nano (JetPack 4.3)
+		- Tested in Jetson Nano (JetPack 4.3) and Jetson NX (JetPack 4.4)
 	- Android (armv7)
 		- not tested yet
 	- Android (aarch64)
@@ -19,9 +19,11 @@ Sample projects to use Tensorflow Lite for multi-platform
 
 - Delegate
 	- Edge TPU
-		- Tested in Raspberry Pi (armv7) and Jetson Nano (aarch64)
-		- Crash happend in Jetson Xavier NX for some reasons...
-	- GPU (todo)
+		- Tested in Raspberry Pi (armv7) and Jetson NX (aarch64)
+	- XNNPACK
+		- Tested in Jetson NX
+	- GPU
+		- Tested in Jetson NX
 
 ## How to build application
 ### Common (Get source code)
@@ -59,13 +61,20 @@ make
 cmake .. -DSPEED_TEST_ONLY=off
 ```
 
-### Options (Edge TPU)
+### Options (Delegate)
 ```sh
-cmake .. -DTFLITE_DELEGATE_EDGETPU=on
-make
+# Edge TPU
+cmake .. -DTFLITE_DELEGATE_EDGETPU=on  -DTFLITE_DELEGATE_GPU=off -DTFLITE_DELEGATE_XNNPACK=off
 cp libedgetpu.so.1.0 libedgetpu.so.1
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`
 sudo LD_LIBRARY_PATH=./ ./main
+
+# GPU
+cmake .. -DTFLITE_DELEGATE_EDGETPU=off -DTFLITE_DELEGATE_GPU=on  -DTFLITE_DELEGATE_XNNPACK=off
+# you may need `sudo apt install ocl-icd-opencl-dev` or `sudo apt install libgles2-mesa-dev`
+
+# XNNPACK
+cmake .. -DTFLITE_DELEGATE_EDGETPU=off -DTFLITE_DELEGATE_GPU=off -DTFLITE_DELEGATE_XNNPACK=on
 ```
 
 ## How to create pre-built TensorflowLite library
@@ -102,7 +111,8 @@ You can create libtensorflow.so for x64, armv7 and aarch64 using the following c
 		bazel build //tensorflow/lite:libtensorflowlite.so \
 		-c opt \
 		--copt -O3 \
-		--strip always
+		--strip always \
+		--define tflite_with_xnnpack=true
 
 		bazel build  //tensorflow/lite/delegates/gpu:libtensorflowlite_gpu_delegate.so \
 		-c opt \
@@ -124,7 +134,8 @@ You can create libtensorflow.so for x64, armv7 and aarch64 using the following c
 		--copt -fpermissive \
 		--define tensorflow_mkldnn_contraction_kernel=0 \
 		--define raspberry_pi_with_neon=true \
-		--strip always
+		--strip always \
+		--define tflite_with_xnnpack=true
 
 		bazel build  //tensorflow/lite/delegates/gpu:libtensorflowlite_gpu_delegate.so \
 		-c opt \
@@ -140,7 +151,8 @@ You can create libtensorflow.so for x64, armv7 and aarch64 using the following c
 		--config elinux_aarch64 \
 		--define tensorflow_mkldnn_contraction_kernel=0 \
 		--copt -O3 \
-		--strip always
+		--strip always \
+		--define tflite_with_xnnpack=true
 
 		bazel build  //tensorflow/lite/delegates/gpu:libtensorflowlite_gpu_delegate.so \
 		-c opt \
@@ -156,7 +168,7 @@ You can create libtensorflow.so(it's actually dll) for Windows using the followi
 - Modify setting for bazel (workaround)
 	- Reference: https://github.com/tensorflow/tensorflow/issues/28824#issuecomment-536669038
 	- Edit `WORKSPACE` file just under the top directory of tensorflow repo
-	```
+	```bazel
 	$ git diff
 	diff --git a/WORKSPACE b/WORKSPACE
 	index ea741c31c7..2115267603 100644
@@ -204,7 +216,8 @@ You can create libtensorflow.so(it's actually dll) for Windows using the followi
 		bazel build //tensorflow/lite:libtensorflowlite.so `
 		-c opt `
 		--copt -O3 `
-		--strip always 
+		--strip always  `
+		
 
 		# bazel build //tensorflow/lite/delegates/gpu:libtensorflowlite_gpu_delegate.so `
 		# -c opt `
@@ -212,6 +225,39 @@ You can create libtensorflow.so(it's actually dll) for Windows using the followi
 		# --copt -DTFLITE_GPU_BINARY_RELEASE `
 		# --strip always 
 		```
+
+### [WIP] For Windows with XNNPACK
+If you want to build Tensorflow Lite with XNNPACK, you need some more works.
+(When I just add `--define tflite_with_xnnpack=true` option, I got link error for `_cvtu32_mask16` ... it looks, I need to use LLVM to build)
+
+- Install LLVM Compiler Toolchain for Visual Studio
+	- https://marketplace.visualstudio.com/items?itemName=LLVMExtensions.llvm-toolchain
+- Install LLVM
+	- https://releases.llvm.org/download.html
+	- (https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/LLVM-10.0.0-win64.exe ) I used this.
+- Modify bazel to build with CLang (just follow the instructions here (https://docs.bazel.build/versions/master/windows.html#build-c-with-clang))
+	- add the following in the top level BUILD file
+	```bazel
+	platform(
+		name = "x64_windows-clang-cl",
+		constraint_values = [
+			"@platforms//cpu:x86_64",
+			"@platforms//os:windows",
+			"@bazel_tools//tools/cpp:clang-cl",
+		],
+	)
+	```
+- Build
+```sh
+set BAZEL_LLVM=C:\Program Files\LLVM
+bazel build //tensorflow/lite:libtensorflowlite.so `
+-c opt `
+--copt -O3 `
+--strip always `
+--define tflite_with_xnnpack=true `
+--extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows-clang-cl --extra_execution_platforms=//:x64_windows-clang-cl `
+--incompatible_enable_cc_toolchain_resolution
+```
 
 ### For Android
 You can create libtensorflow.so for Android (armv7, aarch64) both in PC Linux and in Windows. I used Windows 10 to build.
@@ -224,7 +270,8 @@ You need to install Android SDK and Android NDK beforehand, then specify the pat
 	-c opt `
 	--config android_arm `
 	--copt -O3 `
-	--strip always 
+	--strip always `
+	--define tflite_with_xnnpack=true
 
 	bazel build //tensorflow/lite/delegates/gpu:libtensorflowlite_gpu_delegate.so `
 	-c opt `
@@ -240,7 +287,8 @@ You need to install Android SDK and Android NDK beforehand, then specify the pat
 	-c opt `
 	--config android_arm64 `
 	--copt -O3 `
-	--strip always 
+	--strip always `
+	--define tflite_with_xnnpack=true
 
 	bazel build //tensorflow/lite/delegates/gpu:libtensorflowlite_gpu_delegate.so `
 	-c opt `
@@ -299,7 +347,7 @@ DOCKER_CPUS="k8 armv7a aarch64" DOCKER_TARGETS=libedgetpu make docker-build
 - Run `build.bat` in python terminal like miniconda
 - Build fails so far. If I don't change TENSORFLOW_COMMIT, everything is okay thuogh...
 
-## Acknowledgement
+## Acknowledgements
 - References:
 	- https://www.tensorflow.org/lite/performance/gpu_advanced
 	- https://www.tensorflow.org/lite/guide/android

@@ -16,7 +16,7 @@
 #define IMAGE_NAME   RESOURCE_DIR"/parrot.jpg"
 #define WORK_DIR     RESOURCE_DIR"/model/"
 /* Settings */
-#define LOOP_NUM_FOR_TIME_MEASUREMENT 10
+#define LOOP_NUM_FOR_TIME_MEASUREMENT 100
 
 int main()
 {

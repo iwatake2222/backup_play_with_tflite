@@ -101,8 +101,12 @@ static void readLabel(const char* filename, std::vector<std::string> & labels)
 
 int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 {
-#ifdef TFLITE_DELEGATE_EDGETPU
+#if defined(TFLITE_DELEGATE_EDGETPU)
 	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU);
+#elif defined(TFLITE_DELEGATE_GPU)
+	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_GPU);
+#elif defined(TFLITE_DELEGATE_XNNPACK)
+	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_XNNPACK);
 #else
 	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE);
 #endif

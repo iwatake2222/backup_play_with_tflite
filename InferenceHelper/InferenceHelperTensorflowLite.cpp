@@ -9,6 +9,14 @@
 #include "edgetpu_c.h"
 #endif
 
+#ifdef TFLITE_DELEGATE_GPU
+#include "tensorflow/lite/delegates/gpu/delegate.h"
+#endif
+
+#ifdef TFLITE_DELEGATE_XNNPACK
+#include "tensorflow/lite/delegates/xnnpack/xnnpack_delegate.h"
+#endif
+
 #include "InferenceHelperTensorflowLite.h"
 
 /*** Macro ***/
@@ -39,7 +47,7 @@ int InferenceHelperTensorflowLite::initialize(const char *modelFilename, int num
 	builder(&m_interpreter);
 	CHECK(m_interpreter != nullptr);
 
-	m_interpreter->SetNumThreads(numThreads);
+	 m_interpreter->SetNumThreads(numThreads);
 
 #ifdef TFLITE_DELEGATE_EDGETPU
 	if (m_helperType == TENSORFLOW_LITE_EDGETPU) {
@@ -47,13 +55,29 @@ int InferenceHelperTensorflowLite::initialize(const char *modelFilename, int num
 		std::unique_ptr<edgetpu_device, decltype(&edgetpu_free_devices)> devices(edgetpu_list_devices(&num_devices), &edgetpu_free_devices);
 		CHECK(num_devices > 0);
 		const auto& device = devices.get()[0];
-		auto* delegate = edgetpu_create_delegate(device.type, device.path, nullptr, 0);
-		m_interpreter->ModifyGraphWithDelegate({ delegate, edgetpu_free_delegate });
+		m_delegate = edgetpu_create_delegate(device.type, device.path, nullptr, 0);
+		m_interpreter->ModifyGraphWithDelegate({ m_delegate, edgetpu_free_delegate });
 	}
 #endif
-
+#ifdef TFLITE_DELEGATE_GPU
+	if (m_helperType == TENSORFLOW_LITE_GPU) {
+		printf("aaa\n");
+		auto options = TfLiteGpuDelegateOptionsV2Default();
+		options.inference_preference = TFLITE_GPU_INFERENCE_PREFERENCE_SUSTAINED_SPEED;
+		options.inference_priority1 = TFLITE_GPU_INFERENCE_PRIORITY_MIN_LATENCY;
+		m_delegate = TfLiteGpuDelegateV2Create(&options);
+		m_interpreter->ModifyGraphWithDelegate(m_delegate);
+	}
+#endif
+#ifdef TFLITE_DELEGATE_XNNPACK
+	if (m_helperType == TENSORFLOW_LITE_XNNPACK) {
+		auto options = TfLiteXNNPackDelegateOptionsDefault();
+		options.num_threads = numThreads;
+		m_delegate = TfLiteXNNPackDelegateCreate(&options);
+		m_interpreter->ModifyGraphWithDelegate(m_delegate);
+	}
+#endif
 	CHECK(m_interpreter->AllocateTensors() == kTfLiteOk);
-
 
 	/* Get model information */
 	displayModelInfo(m_interpreter.get());
@@ -63,6 +87,23 @@ int InferenceHelperTensorflowLite::initialize(const char *modelFilename, int num
 
 int InferenceHelperTensorflowLite::finalize(void)
 {
+	
+#ifdef TFLITE_DELEGATE_EDGETPU
+	if (m_helperType == TENSORFLOW_LITE_EDGETPU) {
+		edgetpu_free_delegate(m_delegate);
+	}
+#endif
+#ifdef TFLITE_DELEGATE_GPU
+	if (m_helperType == TENSORFLOW_LITE_GPU) {
+		TfLiteGpuDelegateV2Delete(m_delegate);
+	}
+#endif
+#ifdef TFLITE_DELEGATE_XNNPACK
+	if (m_helperType == TENSORFLOW_LITE_XNNPACK) {
+		TfLiteXNNPackDelegateDelete(m_delegate);
+	}
+#endif
+
 	m_model.reset();
 	m_resolver.reset();
 	m_interpreter.reset();

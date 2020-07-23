@@ -19,13 +19,21 @@ InferenceHelper* InferenceHelper::create(const InferenceHelper::HELPER_TYPE type
 	InferenceHelper* p = NULL;
 	switch (type) {
 	case TENSORFLOW_LITE:
+		PRINT("[InferenceHelper] Use TensorflowLite\n");
 		p = new InferenceHelperTensorflowLite();
 		break;
-#ifdef TFLITE_DELEGATE_EDGETPU
 	case TENSORFLOW_LITE_EDGETPU:
+		PRINT("[InferenceHelper] Use TensorflowLite EdgeTPU Delegate\n");
 		p = new InferenceHelperTensorflowLite();
 		break;
-#endif
+	case TENSORFLOW_LITE_GPU:
+		PRINT("[InferenceHelper] Use TensorflowLite GPU Delegate\n");
+		p = new InferenceHelperTensorflowLite();
+		break;
+	case TENSORFLOW_LITE_XNNPACK:
+		PRINT("[InferenceHelper] Use TensorflowLite XNNPACK Delegate\n");
+		p = new InferenceHelperTensorflowLite();
+		break;
 	default:
 		PRINT("not supported yet");
 		exit(1);

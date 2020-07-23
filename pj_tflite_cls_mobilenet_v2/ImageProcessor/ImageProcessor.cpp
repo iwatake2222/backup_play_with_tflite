@@ -28,8 +28,10 @@
   }
 
 /* Model parameters */
-#ifdef TFLITE_DELEGATE_EDGETPU
+#if defined(TFLITE_DELEGATE_EDGETPU)
 #define MODEL_NAME   "mobilenet_v2_1.0_224_quant_edgetpu"
+#elif defined(TFLITE_DELEGATE_GPU) || defined(TFLITE_DELEGATE_XNNPACK)
+#define MODEL_NAME   "mobilenet_v2_1.0_224"
 #else
 #define MODEL_NAME   "mobilenet_v2_1.0_224_quant"
 #endif
@@ -60,8 +62,12 @@ static void readLabel(const char* filename, std::vector<std::string> & labels)
 
 int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 {
-#ifdef TFLITE_DELEGATE_EDGETPU
+#if defined(TFLITE_DELEGATE_EDGETPU)
 	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU);
+#elif defined(TFLITE_DELEGATE_GPU)
+	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_GPU);
+#elif defined(TFLITE_DELEGATE_XNNPACK)
+	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_XNNPACK);
 #else
 	s_inferenceHelper = InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE);
 #endif
@@ -74,9 +80,11 @@ int ImageProcessor_initialize(const INPUT_PARAM *inputParam)
 	s_outputTensor = new TensorInfo();
 
 	s_inferenceHelper->getTensorByName("input", s_inputTensor);
-	//s_inferenceHelper->getTensorByName("MobilenetV2/Predictions/Reshape_1", s_outputTensor);
+#if defined(TFLITE_DELEGATE_GPU) || defined(TFLITE_DELEGATE_XNNPACK)
+	s_inferenceHelper->getTensorByName("MobilenetV2/Predictions/Reshape_1", s_outputTensor);
+#else
 	s_inferenceHelper->getTensorByName("MobilenetV2/Predictions/Softmax", s_outputTensor);
-
+#endif
 
 	/* read label */
 	readLabel(labelFilename.c_str(), s_labels);
@@ -139,7 +147,7 @@ int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 
 	/* Return the results */
 	outputParam->classId = maxIndex;
-	snprintf(outputParam->label, sizeof(outputParam->label), s_labels[maxIndex].c_str());
+	snprintf(outputParam->label, sizeof(outputParam->label), "%s", s_labels[maxIndex].c_str());
 	outputParam->score = maxScore;
 	
 	return 0;
