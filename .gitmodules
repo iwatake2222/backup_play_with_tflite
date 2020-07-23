@@ -4,3 +4,9 @@
 [submodule "third_party/edgetpu"]
 	path = third_party/edgetpu
 	url = https://github.com/google-coral/edgetpu
+[submodule "third_party/glog"]
+	path = third_party/glog
+	url = https://github.com/google/glog
+[submodule "third_party/abseil-cpp"]
+	path = third_party/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp
